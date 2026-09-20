@@ -1,0 +1,374 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>kkanban</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="header">
+    <button id="sidebar-toggle-btn" class="header-btn" title="Toggle sidebar">☰</button>
+    <div id="board-title-row">
+      <div id="board-title">My Board</div>
+    </div>
+    <button id="board-menu-btn" class="column-menu-btn" title="Board options">⋯</button>
+    <div id="header-search">
+      <input type="text" id="search-input" placeholder="Search cards..." />
+      <button id="search-clear" class="search-clear-btn hidden">×</button>
+    </div>
+    <span id="board-due-badge" class="hidden"></span>
+    <div id="header-right">
+      <button id="btn-pomodoro" class="header-btn" title="Pomodoro Timer">🍅 25:00</button>
+      <button id="btn-completion" class="header-btn">✔ 0/0</button>
+      <button id="btn-calendar" class="header-btn" title="Calendar">📅</button>
+      <button id="btn-labels" class="header-btn" title="Labels">🏷️</button>
+      <button id="btn-archive" class="header-btn" title="Archived Cards">🗃️</button>
+      <button id="btn-sidebar" class="header-btn" title="Upcoming Tasks">📋</button>
+    </div>
+  </div>
+
+  <div id="app-shell">
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <span>Boards</span>
+        <button id="sidebar-menu-btn" title="Board archive">⋯</button>
+      </div>
+      <div id="boards-list"></div>
+      <div id="add-board-area">
+        <button id="add-board-btn">+ New Board</button>
+      </div>
+      <div id="sidebar-footer">
+        <button id="settings-btn">⚙️ Settings</button>
+      </div>
+    </div>
+
+    <div id="board"></div>
+  </div>
+
+  <div id="pomo-board-overlay" class="hidden">
+    <div id="pomo-board-tomato-wrap">
+      <div id="pomo-board-ring"></div>
+      <div id="pomo-board-ring-inner">
+        <img id="pomo-board-tomato-emoji" src="/assets/emoji/1f345-fluent.png" alt="" draggable="false" />
+      </div>
+    </div>
+    <div id="pomo-board-milk-wrap" class="hidden">
+      <div id="pomo-board-milk-base"><span>🥛</span></div>
+      <div id="pomo-board-milk-fill"><span>🥛</span></div>
+    </div>
+    <div id="pomo-board-label">
+      <div id="pomo-board-time"></div>
+      <div id="pomo-board-session-info"></div>
+      <div id="pomo-board-controls">
+        <button id="pomo-board-reset-btn" type="button" title="Reset">↺</button>
+        <button id="pomo-board-toggle-btn" type="button" title="Pause"></button>
+        <button id="pomo-board-skip-btn" type="button" title="Skip"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upcoming-sidebar" class="hidden">
+    <div class="upcoming-header">
+      <span>Upcoming Tasks</span>
+      <button id="upcoming-close" class="modal-close-btn">×</button>
+    </div>
+    <div id="upcoming-list"></div>
+  </div>
+
+  <div id="detail-overlay" class="hidden">
+    <div id="detail-modal">
+      <button id="detail-close" class="modal-close-btn">×</button>
+
+      <div id="detail-header-row">
+        <input type="text" id="detail-title" placeholder="Card title" />
+      </div>
+
+      <div id="detail-labels-row" class="labels-row">
+        <div class="labels-row-top">
+          <button id="detail-labels-btn" class="labels-add-btn">🏷️ Labels</button>
+          <button id="detail-complete-btn"></button>
+        </div>
+        <div id="detail-labels-pills" class="labels-pills"></div>
+      </div>
+
+      <div class="due-date-row">
+        <input type="date" id="detail-due-date" />
+        <label class="time-toggle hidden" id="detail-time-toggle-label">
+          <input type="checkbox" id="detail-due-time-toggle" /> Set Time
+        </label>
+        <input type="time" id="detail-due-time" class="hidden" />
+        <button id="detail-due-clear" class="clear-due-btn hidden">Clear date</button>
+        <button id="detail-due-time-confirm" class="time-confirm-btn hidden">Confirm</button>
+      </div>
+
+      <div id="detail-split">
+        <div id="detail-pane-description" class="detail-pane">
+          <h4>Description</h4>
+          <div id="detail-description-toolbar" class="rte-toolbar">
+            <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+            <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+            <button type="button" class="rte-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+            <button type="button" class="rte-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" id="rte-font-size-dec" title="Decrease font size">&minus;</button>
+            <button type="button" class="rte-btn" id="rte-font-size-reset" title="Reset to normal size">Reset</button>
+            <button type="button" class="rte-btn" id="rte-font-size-inc" title="Increase font size">+</button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" data-heading="H1" title="Heading 1">H1</button>
+            <button type="button" class="rte-btn" data-heading="H2" title="Heading 2">H2</button>
+            <button type="button" class="rte-btn" data-heading="H3" title="Heading 3">H3</button>
+            <button type="button" class="rte-btn" data-heading="BLOCKQUOTE" title="Quote">&quot;</button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" data-cmd="insertUnorderedList" title="Bullet list">&bull; list</button>
+            <button type="button" class="rte-btn" data-cmd="insertOrderedList" title="Numbered list">1. list</button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" data-cmd="outdent" title="Decrease indent">&#8592;</button>
+            <button type="button" class="rte-btn" data-cmd="indent" title="Increase indent">&#8594;</button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" id="rte-link-btn" title="Link">&#128279; Link</button>
+            <span class="rte-sep"></span>
+            <button type="button" class="rte-btn" id="rte-emoji-btn" title="Emoji">&#128512;</button>
+          </div>
+          <div id="detail-description" contenteditable="true" data-placeholder="Description..."></div>
+        </div>
+        <div id="detail-divider"></div>
+        <div id="detail-pane-side" class="detail-pane">
+          <h4>Checklist</h4>
+          <div id="checklist-items"></div>
+          <div class="checklist-add-row">
+            <input type="text" id="checklist-input" placeholder="Add item..." />
+            <button id="checklist-add-btn">Add</button>
+          </div>
+
+          <h4 class="comments-heading">Notes</h4>
+          <div id="comments-list"></div>
+          <div class="comment-add-row">
+            <input type="text" id="comment-input" placeholder="Add note..." />
+            <button id="comment-add-btn">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-buttons">
+        <button id="detail-delete">Delete Card</button>
+        <button id="detail-archive">Archive Card</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="calendar-overlay" class="hidden">
+    <div id="calendar-modal">
+      <button id="calendar-close" class="modal-close-btn">×</button>
+      <div class="calendar-header">
+        <button id="calendar-prev">‹</button>
+        <span id="calendar-month-label"></span>
+        <button id="calendar-next">›</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid"></div>
+      <div class="calendar-day-panel">
+        <div id="calendar-day-label" class="calendar-day-label">Select a day</div>
+        <div id="calendar-day-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="labels-overlay" class="hidden">
+    <div id="labels-modal">
+      <button id="labels-close" class="modal-close-btn">×</button>
+      <h4>Labels</h4>
+      <div id="labels-list"></div>
+      <div id="labels-add-row">
+        <div id="label-name-row" class="inline-add-row">
+          <input type="text" id="label-name-input" placeholder="Label name..." />
+        </div>
+        <div id="label-color-swatches"></div>
+        <button id="label-add-btn">Add Label</button>
+      </div>
+    </div>
+    <button id="label-templates-tab" title="Label Templates">
+      <span class="tab-icon">🏷️</span><span class="tab-label">Label Templates</span>
+    </button>
+    <div id="label-templates-panel" class="hidden">
+      <div id="label-templates-header">
+        <button id="label-templates-collapse" title="Hide">«</button>
+        <span>Label Templates</span>
+      </div>
+      <div id="label-templates-body">
+        <div id="label-templates-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="archived-cards-overlay" class="hidden">
+    <div id="archived-cards-modal">
+      <button id="archived-cards-close" class="modal-close-btn">×</button>
+      <h4>Archived Cards</h4>
+      <input type="text" id="archived-cards-search" class="archived-search-input" placeholder="Search archived cards..." />
+      <div id="archived-cards-grid" class="archived-cards-grid"></div>
+    </div>
+  </div>
+
+  <div id="archived-boards-overlay" class="hidden">
+    <div id="archived-boards-modal">
+      <button id="archived-boards-close" class="modal-close-btn">×</button>
+      <h4>Archived Boards</h4>
+      <div id="archived-boards-list"></div>
+    </div>
+  </div>
+
+  <div id="pomodoro-overlay" class="hidden">
+    <div id="pomodoro-modal">
+      <button id="pomodoro-close" class="modal-close-btn">×</button>
+      <div id="pomodoro-mode-toggle">
+        <button id="pomodoro-mode-tomato" class="pomo-mode-btn">🍅 Tomato</button>
+        <button id="pomodoro-mode-cow" class="pomo-mode-btn">🥛 Milk</button>
+      </div>
+      <div id="pomodoro-phase-label">Focus Session</div>
+
+      <div id="pomodoro-visual">
+        <div id="pomo-ring-wrap">
+          <div id="pomo-ring"></div>
+          <div id="pomo-ring-inner"></div>
+        </div>
+        <div id="pomo-milk-wrap" class="hidden">
+          <div id="pomo-milk-base"><span>🥛</span></div>
+          <div id="pomo-milk-fill"><span>🥛</span></div>
+        </div>
+        <div id="pomodoro-time-display-wrap">
+          <div id="pomodoro-digit-row">
+            <input class="pomo-digit-input" data-idx="0" maxlength="1" inputmode="numeric" autocomplete="off" value="2" />
+            <input class="pomo-digit-input" data-idx="1" maxlength="1" inputmode="numeric" autocomplete="off" value="5" />
+            <span class="pomo-digit-sep">:</span>
+            <input class="pomo-digit-input" data-idx="2" maxlength="1" inputmode="numeric" autocomplete="off" value="0" />
+            <input class="pomo-digit-input" data-idx="3" maxlength="1" inputmode="numeric" autocomplete="off" value="0" />
+          </div>
+        </div>
+      </div>
+
+      <div id="pomodoro-plan-settings">
+        <div class="pomo-plan-row">
+          <span class="pomo-plan-label">Short break length</span>
+          <span class="pomo-plan-value"><input id="pomo-short-break-input" class="pomo-plan-input" type="text" inputmode="numeric" maxlength="3" /><span class="pomo-plan-unit">min</span></span>
+        </div>
+        <div class="pomo-plan-row">
+          <span class="pomo-plan-label">Long break length</span>
+          <span class="pomo-plan-value"><input id="pomo-long-break-input" class="pomo-plan-input" type="text" inputmode="numeric" maxlength="3" /><span class="pomo-plan-unit">min</span></span>
+        </div>
+        <div class="pomo-plan-row">
+          <span class="pomo-plan-label">Number of sessions</span>
+          <span class="pomo-plan-value"><input id="pomo-sessions-input" class="pomo-plan-input" type="text" inputmode="numeric" maxlength="2" /><span class="pomo-plan-unit"></span></span>
+        </div>
+        <div class="pomo-plan-row">
+          <span class="pomo-plan-label">Long break every</span>
+          <span class="pomo-plan-value"><input id="pomo-long-break-every-input" class="pomo-plan-input" type="text" inputmode="numeric" maxlength="2" /><span class="pomo-plan-unit">sessions</span></span>
+        </div>
+        <label id="pomo-persist-settings-row">
+          <input type="checkbox" id="pomo-persist-settings-toggle" />
+          Remember settings
+        </label>
+      </div>
+
+      <div id="pomodoro-session-count">Session 1 of 4</div>
+
+      <div id="pomodoro-controls">
+        <button id="pomodoro-toggle-btn">Start</button>
+        <button id="pomodoro-skip-btn">Skip</button>
+        <button id="pomodoro-reset-btn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="background-overlay" class="hidden">
+    <div id="background-modal">
+      <button id="background-close" class="modal-close-btn">×</button>
+      <h4>Board Background</h4>
+      <div id="background-preview-wrap">
+        <div id="background-preview"></div>
+      </div>
+      <input type="file" id="background-file-input" accept="image/*" class="hidden" />
+      <button id="background-choose-btn" class="labels-add-btn" style="width:100%;">🖼️ Choose Image...</button>
+      <button id="background-remove-btn" class="hidden danger-btn">Remove Background</button>
+      <div id="background-blur-row" class="hidden">
+        <label class="settings-label">Blur: <span id="background-blur-value">0px</span></label>
+        <input type="range" id="background-blur-slider" min="0" max="20" value="0" />
+      </div>
+      <button id="background-close-bottom" class="labels-add-btn" style="width:100%;">Close</button>
+    </div>
+  </div>
+
+  <div id="settings-overlay" class="hidden">
+    <div id="settings-modal">
+      <button id="settings-close" class="modal-close-btn">×</button>
+      <h4>Settings</h4>
+
+      <div class="settings-section">
+        <div class="settings-label">Theme</div>
+        <div class="swatch-option-row">
+          <button class="theme-option" data-theme="dark">Dark</button>
+          <button class="theme-option" data-theme="light">Light</button>
+          <button class="theme-option" data-theme="lavender">Lavender</button>
+          <button class="theme-option" data-theme="christmas">🎄 Christmas</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Background Pattern</div>
+        <div class="swatch-option-row">
+          <button class="pattern-option" data-pattern="none">None</button>
+          <button class="pattern-option" data-pattern="dots">Dotted</button>
+          <button class="pattern-option" data-pattern="lines">Lines</button>
+          <button class="pattern-option" data-pattern="grid">Grid</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Data File Location</div>
+        <div id="settings-data-path" class="settings-path-box">Loading...</div>
+        <p class="settings-hint">
+          This one file holds every board, column, card, label, and due date. To back up:
+          copy this file somewhere safe. To restore on a new device: install kkanban, close it
+          if it's open, place your backup file at this exact path, then open kkanban.
+        </p>
+      </div>
+
+      <div class="settings-section">
+        <button id="about-btn" class="labels-add-btn" style="width:100%;">About kkanban</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="about-overlay" class="hidden">
+    <div id="about-modal">
+      <button id="about-close" class="modal-close-btn">×</button>
+      <h4>About kkanban</h4>
+
+      <div class="about-row"><span class="about-label">Version</span><span class="about-value">0.1.0</span></div>
+      <div class="about-row"><span class="about-label">Created by</span><span class="about-value">Rain Cow🔰🐽🥛</span></div>
+
+      <div class="about-block">
+        <div class="settings-label">Tools Used</div>
+        <ul class="about-list">
+          <li>rustup</li>
+          <li>Node.js v22.23.2 LTS</li>
+          <li>npm</li>
+          <li>Tauri</li>
+          <li>Cargo</li>
+          <li>Visual Studio Code</li>
+          <li>Microsoft Edge WebView2</li>
+        </ul>
+      </div>
+
+      <div class="about-block">
+        <div class="settings-label">Special Thanks</div>
+        <ul class="about-list">
+          <li>Brisqi, for convincing me to build my own app.</li>
+          <li>Venice AI, for helping to kickstart this project and for providing feedback!</li>
+          <li>Claude, for pair-programming every feature since — and for this very About page.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

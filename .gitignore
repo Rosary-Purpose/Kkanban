@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Pomodoro SFX - licensed from a paid asset pack (allowed bundled in the
+# built app, not for raw redistribution) - see README for what to do if
+# building from a fresh clone.
+src/assets/sounds/
+
+# App icon - the source artwork is a purchased asset whose license allows
+# using it to build a product, but not redistributing the asset itself
+# standalone (which is exactly what committing these image files to a
+# public repo would do). Unlike the SFX above, tauri.conf.json actually
+# requires these specific files to exist to build at all - see README for
+# what to do if building from a fresh clone.
+src-tauri/icons/

@@ -1,0 +1,1782 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+
+/* ---------- Theme variables ---------- */
+:root {
+  --bg-body: #1e1f26;
+  --bg-header: #202127;
+  --bg-sidebar: #1a1b21;
+  --bg-column: #2a2b36;
+  --bg-card: #3a3c4a;
+  --bg-modal: #2a2b36;
+  --bg-input: #1e1f26;
+  --bg-hover: rgba(255,255,255,0.06);
+  --bg-hover-strong: rgba(255,255,255,0.1);
+  --text-primary: #eee;
+  --text-secondary: #ccc;
+  --text-muted: #999;
+  --text-faint: #777;
+  --border-color: #444;
+  --border-subtle: #333;
+  --accent: #5865f2;
+  --pattern-color: rgba(255,255,255,0.07);
+  --pattern-color-dots: rgba(255,255,255,0.12);
+}
+:root[data-theme="light"] {
+  --bg-body: #f2f3f5;
+  --bg-header: #ffffff;
+  --bg-sidebar: #ebedf0;
+  --bg-column: #e6e8ec;
+  --bg-card: #ffffff;
+  --bg-modal: #ffffff;
+  --bg-input: #f2f3f5;
+  --bg-hover: rgba(0,0,0,0.05);
+  --bg-hover-strong: rgba(0,0,0,0.09);
+  --text-primary: #1e1f26;
+  --text-secondary: #444;
+  --text-muted: #767a80;
+  --text-faint: #98a0a8;
+  --border-color: #ddd;
+  --border-subtle: #e2e2e6;
+  --accent: #5865f2;
+  --pattern-color: rgba(0,0,0,0.06);
+  --pattern-color-dots: rgba(0,0,0,0.10);
+}
+:root[data-theme="lavender"] {
+  --bg-body: #f1ecfb;
+  --bg-header: #e6dbf9;
+  --bg-sidebar: #ddccf5;
+  --bg-column: #ebe0fa;
+  --bg-card: #ffffff;
+  --bg-modal: #ffffff;
+  --bg-input: #f1ecfb;
+  --bg-hover: rgba(120,70,210,0.08);
+  --bg-hover-strong: rgba(120,70,210,0.14);
+  --text-primary: #372a55;
+  --text-secondary: #5c4c80;
+  --text-muted: #8b7ab0;
+  --text-faint: #ab9dcc;
+  --border-color: #cdbaef;
+  --border-subtle: #ddccf5;
+  --accent: #8b5cf6;
+  --pattern-color: rgba(139,92,246,0.09);
+  --pattern-color-dots: rgba(139,92,246,0.14);
+}
+/* Deep pine green throughout (kept internally consistent, like the other
+   themes) with cream/ivory text, muted gold trim, and a festive red accent. */
+:root[data-theme="christmas"] {
+  --bg-body: #0b3d24;
+  --bg-header: #072818;
+  --bg-sidebar: #062315;
+  --bg-column: #0f4a2c;
+  --bg-card: #14562f;
+  --bg-modal: #123f26;
+  --bg-input: #0a2e1b;
+  --bg-hover: rgba(212,175,55,0.14);
+  --bg-hover-strong: rgba(212,175,55,0.26);
+  --text-primary: #fdf3d8;
+  --text-secondary: #e6dcb8;
+  --text-muted: #b9a97a;
+  --text-faint: #8a7c54;
+  --border-color: #8a6d1f;
+  --border-subtle: #234a30;
+  --accent: #c81d25;
+  --pattern-color: rgba(212,175,55,0.08);
+  --pattern-color-dots: rgba(212,175,55,0.14);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  background: var(--bg-body);
+  color: var(--text-primary);
+  user-select: none;
+}
+
+/* ---------- Header ---------- */
+#header {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-subtle);
+}
+/* Mirrors .column-title-row: a plain click-to-rename swap only ever
+   replaces #board-title itself (text + emoji-if-already-set), never this
+   outer row - so the hover-to-reveal "add emoji" slot below, being a
+   sibling rather than a child, stays visible/usable while renaming, same
+   as it already does for column titles. */
+#board-title-row { display: flex; align-items: center; min-width: 0; }
+#board-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: text;
+  padding: 5px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+#board-title:hover { background: var(--bg-hover); }
+/* Same hover-to-reveal pattern as .column-emoji-hover-btn - width (not
+   just opacity) collapses to 0 at rest so a board with no emoji yet has
+   no reserved gap, only opening up on hovering the title row. */
+#board-title-row .board-emoji-hover-btn {
+  width: 0; height: 20px;
+  overflow: hidden;
+  border: none; background: transparent; padding: 0;
+  font-size: 14px; border-radius: 4px; margin-right: 0;
+  flex-shrink: 0;
+  opacity: 0; pointer-events: none;
+  transition: width 0.15s ease, margin-right 0.15s ease, opacity 0.15s ease;
+}
+#board-title-row:hover .board-emoji-hover-btn { width: 20px; margin-right: 6px; opacity: 0.4; pointer-events: auto; }
+#board-title-row .board-emoji-hover-btn:hover { opacity: 0.75 !important; background: var(--bg-hover); }
+.board-title-input {
+  font-weight: 600;
+  font-size: 15px;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 5px 7px;
+  font-family: inherit;
+}
+#header-search {
+  flex: 1;
+  max-width: 360px;
+  margin-left: 8px;
+  position: relative;
+}
+#search-input {
+  width: 100%;
+  padding: 7px 30px 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.search-clear-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1;
+}
+.search-clear-btn:hover { color: var(--text-primary); }
+#header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.header-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.header-btn:hover { background: var(--bg-hover); }
+
+/* ---------- App shell ---------- */
+#app-shell {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ---------- Sidebar ---------- */
+#sidebar {
+  position: relative;
+  z-index: 5;
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.15s ease;
+}
+#sidebar.collapsed { width: 0; border-right: none; }
+#sidebar-header {
+  padding: 14px 14px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#sidebar-menu-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+#sidebar-menu-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+#boards-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
+.board-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-item:hover { background: var(--bg-hover); }
+.board-item-active { background: var(--bg-card); color: var(--text-primary); font-weight: 600; }
+.board-item-emoji { margin-right: 6px; }
+.board-item-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; box-shadow: 0 6px 16px rgba(0,0,0,0.5); margin: 0; background: var(--bg-card); }
+.board-item-dragging-source { opacity: 0.3; }
+.board-item-drop-indicator { height: 2px; background: var(--accent); border-radius: 1px; margin: 0 10px 2px; }
+
+#add-board-area { padding: 6px 8px 10px; white-space: nowrap; }
+#add-board-btn {
+  width: 100%;
+  background: var(--bg-hover);
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+#add-board-btn:hover { background: var(--bg-hover-strong); }
+#new-board-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+#sidebar-footer { border-top: 1px solid var(--border-subtle); padding: 8px; white-space: nowrap; }
+#settings-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+#settings-btn:hover { background: var(--bg-hover); }
+
+/* ---------- Board / Columns ---------- */
+#board {
+  flex: 1;
+  position: relative;
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  min-height: 0;
+  background-color: var(--bg-body);
+  scrollbar-color: var(--border-color) transparent;
+}
+#board::-webkit-scrollbar { height: 10px; }
+#board::-webkit-scrollbar-track { background: transparent; }
+#board::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 5px;
+  transition: background-color 0.4s ease;
+}
+#board.scrollbar-hidden { scrollbar-color: transparent transparent; }
+#board.scrollbar-hidden::-webkit-scrollbar-thumb { background-color: transparent; }
+:root[data-pattern="dots"] #board {
+  background-image:
+    radial-gradient(var(--pattern-color-dots) 2px, transparent 2px),
+    radial-gradient(var(--pattern-color-dots) 2px, transparent 2px);
+  background-size: 25px 25px, 25px 25px;
+  background-position: 0 0, 12.5px 12.5px;
+}
+:root[data-pattern="lines"] #board {
+  background-image: repeating-linear-gradient(-45deg, var(--pattern-color), var(--pattern-color) 1px, transparent 1px, transparent 14px);
+}
+:root[data-pattern="grid"] #board {
+  background-image:
+    linear-gradient(var(--pattern-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pattern-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+/* Christmas theme's own signature look on the board - scattered little
+   snowflakes - shown only when no other pattern is explicitly chosen, so an
+   explicit dots/lines/grid pick (already gold-tinted via this theme's
+   --pattern-color) still wins. The candy-cane stripe lives on the header
+   and sidebar instead (see below), not the board itself.
+   Same layered-tile trick the dots pattern uses (two radial-gradients at
+   offset positions so the grid doesn't read as a strict lattice) but taken
+   further: four tiles of different sizes, each with its flake off-center
+   and at its own scale/rotation. Because the tile periods don't share a
+   common factor, the flakes never fall into a visible repeating grid. */
+:root[data-theme="christmas"][data-pattern="none"] #board {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23fdf3d8' stroke-width='1.3' stroke-linecap='round' opacity='0.32' transform='rotate(12 20 54)'%3E%3Cline x1='20' y1='41' x2='20' y2='67'/%3E%3Cline x1='7' y1='54' x2='33' y2='54'/%3E%3Cline x1='10.8' y1='44.8' x2='29.2' y2='63.2'/%3E%3Cline x1='29.2' y1='44.8' x2='10.8' y2='63.2'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23fdf3d8' stroke-width='1.6' stroke-linecap='round' opacity='0.38' transform='rotate(-18 74 22)'%3E%3Cline x1='74' y1='5' x2='74' y2='39'/%3E%3Cline x1='57' y1='22' x2='91' y2='22'/%3E%3Cline x1='62' y1='10' x2='86' y2='34'/%3E%3Cline x1='86' y1='10' x2='62' y2='34'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%23fdf3d8' stroke-width='1.8' stroke-linecap='round' opacity='0.22' transform='rotate(33 42 96)'%3E%3Cline x1='42' y1='74' x2='42' y2='118'/%3E%3Cline x1='20' y1='96' x2='64' y2='96'/%3E%3Cline x1='26.4' y1='80.4' x2='57.6' y2='111.6'/%3E%3Cline x1='57.6' y1='80.4' x2='26.4' y2='111.6'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='58' height='58' viewBox='0 0 58 58'%3E%3Cg fill='none' stroke='%23fdf3d8' stroke-width='1.1' stroke-linecap='round' opacity='0.28' transform='rotate(-8 12 12)'%3E%3Cline x1='12' y1='3' x2='12' y2='21'/%3E%3Cline x1='3' y1='12' x2='21' y2='12'/%3E%3Cline x1='5.6' y1='5.6' x2='18.4' y2='18.4'/%3E%3Cline x1='18.4' y1='5.6' x2='5.6' y2='18.4'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 72px 72px, 100px 100px, 140px 140px, 58px 58px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Candy-cane trim on the header/sidebar, moved here per feedback. Painted
+   as a thin ribbon confined to the very edge (a pseudo-element, not the
+   header/sidebar's own background) rather than washed across the whole
+   surface - the full-surface version showed through every transparent-
+   background button and list row in there (search icon, board rows,
+   Settings, etc.), reading as if it sat on top of that text. A slim edge
+   ribbon can't overlap any content at all. */
+:root[data-theme="christmas"] #header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 4px;
+  background-image: repeating-linear-gradient(-45deg, #c81d25 0, #c81d25 6px, #fdf3d8 6px, #fdf3d8 12px);
+  pointer-events: none;
+}
+:root[data-theme="christmas"] #sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 4px;
+  background-image: repeating-linear-gradient(45deg, #c81d25 0, #c81d25 6px, #fdf3d8 6px, #fdf3d8 12px);
+  pointer-events: none;
+}
+#board-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+
+.column {
+  position: relative;
+  background: var(--bg-column);
+  border-radius: 10px;
+  flex: 0 0 280px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  transition: outline 0.1s;
+}
+.column.drag-over { outline: 2px dashed var(--accent); outline-offset: -4px; }
+.column-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.column-drag-handle { cursor: grab; color: var(--text-faint); font-size: 14px; padding: 2px 4px; }
+.column-title-row { flex: 1; min-width: 0; display: flex; align-items: center; }
+.column-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  font-weight: 700;
+  cursor: text;
+  padding: 3px 5px;
+  border-radius: 4px;
+  word-break: break-word;
+}
+.column-title:hover { background: var(--bg-hover); }
+.column-title-input {
+  flex: 1;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-family: inherit;
+  font-weight: 700;
+}
+.column-menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.column-menu-btn:hover { color: var(--text-secondary); background: var(--bg-hover); }
+
+.column-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; box-shadow: 0 6px 20px rgba(0,0,0,0.5); margin: 0; }
+.column-dragging-source { opacity: 0.3; }
+.column-drop-indicator { width: 3px; align-self: stretch; background: var(--accent); border-radius: 2px; flex-shrink: 0; }
+
+#add-column-btn {
+  align-self: flex-start;
+  flex: 0 0 220px;
+  background: var(--bg-hover);
+  border: none;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#add-column-btn:hover { background: var(--bg-hover-strong); }
+
+.inline-add-column { flex: 0 0 220px; background: var(--bg-column); border-radius: 10px; padding: 10px; align-self: flex-start; }
+.inline-add-column-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+.inline-add-row { display: flex; align-items: flex-start; gap: 6px; }
+.inline-add-row .inline-add-input, .inline-add-row .inline-add-column-input { flex: 1; }
+/* The emoji button sits after the input in DOM order (so Tab reaches it
+   right after typing a title), but should still appear on the left. */
+.inline-add-row .emoji-slot-btn { order: -1; }
+.inline-add-confirm-btn {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  background: var(--bg-hover-strong);
+  border: none;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.inline-add-confirm-btn:hover { background: var(--accent); color: #fff; }
+
+/* ---------- Cards ---------- */
+.cards { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 40px; overflow-y: auto; }
+.card {
+  position: relative;
+  background: var(--bg-card);
+  border-radius: 6px;
+  padding: 10px 28px 10px 10px;
+  cursor: grab;
+  color: var(--text-primary);
+}
+.card-top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.card-title { font-size: 14px; font-weight: 700; word-break: break-word; display: flex; align-items: center; min-width: 0; }
+.title-text { min-width: 0; }
+.due-badge {
+  flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 10px; white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+}
+.due-red { background: #e03131; color: #ffffff; }
+.due-orange { background: #f08c00; color: #ffffff; }
+.due-blue { background: #1971c2; color: #ffffff; }
+.due-overdue { background: #000000; color: #ff4d4d; }
+.due-badge.due-completed { background: var(--bg-hover-strong); color: var(--text-faint); text-decoration: line-through; box-shadow: none; }
+.board-due-badge { font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 6px; white-space: nowrap; margin-left: 10px; cursor: pointer; }
+.board-due-badge.due-red { background: #e03131; color: #ffffff; }
+.board-due-badge.due-orange { background: #f08c00; color: #ffffff; }
+.board-due-badge.due-blue { background: #1971c2; color: #ffffff; }
+.board-due-badge.due-overdue { background: #000000; color: #ff4d4d; }
+.card-labels-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.card-label-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+
+.card-desc-preview {
+  font-size: 12px;
+  color: inherit;
+  opacity: 0.82;
+  margin-top: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.35;
+}
+.card-checklist-preview {
+  position: relative;
+  margin-top: 6px;
+}
+.card-checklist-scroll {
+  max-height: 108px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-right: 8px;
+  /* No cursor override here (used to be `default`, from back when this
+     was plain decorative text) - now that this area behaves like the rest
+     of the card again (a plain click/drag opens/moves the card), it should
+     inherit the same grab cursor .card has, not read as a dead zone.
+     .card-checklist-preview-check sets its own `pointer` directly on the
+     checkbox, which as a more specific rule still wins there regardless. */
+  /* The real scrollbar is hidden entirely rather than styled thin - in the
+     actual Tauri webview (unlike a regular Chrome tab) an unstyled-button
+     ::-webkit-scrollbar still renders as a thick classic scrollbar with
+     up/down arrow buttons here. A custom thumb (.card-checklist-thumb,
+     positioned by JS to track scroll position - see
+     refreshChecklistPreviewOverflow in main.js) stands in for it instead,
+     as a sibling outside the scrolling flow so it doesn't scroll away with
+     the content. Mouse-wheel scrolling still works with the native
+     scrollbar hidden. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.card-checklist-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.card-checklist-thumb-track {
+  position: absolute;
+  top: 0;
+  right: 1px;
+  bottom: 0;
+  width: 3px;
+  display: none;
+  pointer-events: none;
+}
+.card-checklist-preview.has-scroll .card-checklist-thumb-track { display: block; }
+/* currentColor ties the thumb to the same contrast-safe text color as the
+   rest of the card's content, so it stays visible on any card color. */
+.card-checklist-thumb {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.4;
+}
+.card-checklist-preview-item { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: inherit; opacity: 0.82; line-height: 1.3; }
+.card-checklist-preview-item.checklist-done { color: inherit; opacity: 0.5; }
+/* accent-color:currentColor - same "tie it to the card's own contrast-safe
+   text color" trick already used on .card-checklist-thumb, so the check
+   tint stays visible against any card background color. */
+.card-checklist-preview-check {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  margin: 1px 0 0;
+  cursor: pointer;
+  accent-color: currentColor;
+}
+.card-checklist-preview-text { word-break: break-word; }
+
+.card-footer { display: flex; gap: 8px; font-size: 12px; color: inherit; opacity: 0.65; margin-top: 6px; }
+.card .delete-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: none; border: none; color: inherit; opacity: 0.65;
+  cursor: pointer; font-size: 16px; line-height: 1;
+}
+.card .delete-btn:hover { color: #f55; opacity: 1; }
+.card-complete-badge { position: absolute; top: 6px; right: 26px; font-size: 12px; line-height: 1; }
+.card-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; box-shadow: 0 6px 16px rgba(0,0,0,0.5); margin: 0; }
+.card-dragging-source { opacity: 0.3; }
+
+.drop-indicator { height: 3px; background: var(--accent); border-radius: 2px; flex-shrink: 0; }
+
+.inline-add-card { padding: 6px; cursor: default; }
+.inline-add-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+}
+
+.add-card-btn {
+  margin-top: 10px;
+  background: var(--bg-hover-strong);
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.add-card-btn:hover { filter: brightness(1.15); }
+
+/* ---------- Shared modal basics ---------- */
+.hidden { display: none !important; }
+#detail-overlay, #calendar-overlay, #labels-overlay, #settings-overlay, #background-overlay, #about-overlay, #archived-cards-overlay, #archived-boards-overlay, #pomodoro-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+}
+#detail-modal, #calendar-modal, #labels-modal, #settings-modal, #background-modal, #about-modal, #archived-cards-modal, #archived-boards-modal, #pomodoro-modal {
+  background: var(--bg-modal);
+  color: var(--text-primary);
+  padding: 20px;
+  border-radius: 10px;
+  position: relative;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+#detail-modal { width: 900px; max-width: 92vw; }
+#settings-modal { width: 380px; }
+#background-modal { width: 320px; }
+#about-modal { width: 380px; }
+#archived-cards-modal { width: 640px; max-width: 92vw; }
+#archived-boards-modal { width: 340px; max-width: 92vw; }
+.modal-close-btn {
+  position: absolute; top: 12px; right: 12px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--text-muted);
+  font-size: 18px; cursor: pointer; line-height: 1; z-index: 5;
+}
+.modal-close-btn:hover { color: var(--text-primary); }
+#detail-modal h4, #labels-modal h4, #settings-modal h4, #background-modal h4, #about-modal h4, #archived-cards-modal h4, #archived-boards-modal h4 { margin: 0 0 14px; }
+#detail-title, #detail-description, #checklist-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  font-family: inherit;
+  font-size: 14px;
+}
+#detail-title::placeholder, #detail-description::placeholder, #checklist-input::placeholder { color: var(--text-faint); }
+#checklist-input { padding: 3px 8px; margin-bottom: 0; }
+#detail-title { font-size: 15px; font-weight: 700; }
+
+/* ---------- Card detail: header row (emoji + title) ---------- */
+#detail-header-row { display: flex; align-items: stretch; gap: 10px; padding-right: 30px; }
+#detail-header-row #detail-title { flex: 1; margin-bottom: 0; }
+#detail-header-row .emoji-slot-btn { width: auto; height: auto; aspect-ratio: 1; font-size: 20px; }
+#detail-complete-btn {
+  flex-shrink: 0; white-space: nowrap; margin-left: auto;
+  padding: 8px 12px; border-radius: 6px;
+  border: 1px solid var(--border-color); background: var(--bg-hover);
+  color: var(--text-secondary); font-size: 13px; cursor: pointer;
+}
+#detail-complete-btn:hover { background: var(--bg-hover-strong); }
+#detail-complete-btn.is-completed { background: #2f9e44; color: #ffffff; border-color: transparent; }
+#detail-complete-btn.is-completed .label-hover { display: none; }
+#detail-complete-btn.is-completed:hover .label-default { display: none; }
+#detail-complete-btn.is-completed:hover .label-hover { display: inline; }
+#detail-complete-btn.is-completed:hover { background: #ffb020; color: #2b1d00; }
+.labels-row, .due-date-row { margin-top: 12px; }
+
+/* ---------- Card detail: split body (description | checklist + comments) ---------- */
+/* min-height (not a fixed height) - the description side needs to be free
+   to grow taller as its own content grows (see #detail-description below),
+   pushing the rest of the modal down rather than clipping. */
+#detail-split { display: flex; min-height: 260px; margin: 4px 0 16px; }
+.detail-pane { flex: 1 1 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; }
+#detail-pane-description { padding-right: 16px; overflow-y: visible; }
+#detail-pane-side { padding-left: 16px; }
+#detail-pane-description #detail-description {
+  /* Grows with typed content (see the "input" listener on this element),
+     from its original 160px up to 2.5x that (400px) - past that point it
+     scrolls internally instead of growing further. */
+  flex: none; height: 160px; min-height: 160px; max-height: 400px;
+  overflow-y: auto; resize: none; margin-bottom: 0; cursor: text;
+  overflow-wrap: break-word;
+}
+#detail-description:empty::before { content: attr(data-placeholder); color: var(--text-faint); }
+#detail-description p { margin: 0 0 8px; }
+#detail-description p:last-child { margin-bottom: 0; }
+#detail-description ul, #detail-description ol { margin: 4px 0; padding-left: 22px; }
+#detail-description h1, #detail-description h2, #detail-description h3 { margin: 10px 0 6px; line-height: 1.25; }
+#detail-description h1:first-child, #detail-description h2:first-child, #detail-description h3:first-child { margin-top: 0; }
+#detail-description h1 { font-size: 18px; font-weight: 800; }
+#detail-description h2 { font-size: 16px; font-weight: 700; }
+#detail-description h3 { font-size: 14px; font-weight: 700; }
+#detail-description a { color: var(--accent); text-decoration: underline; }
+#detail-description blockquote {
+  margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--accent);
+  color: var(--text-secondary); font-style: italic;
+}
+/* align-self:stretch + fixed-px margin (not height:70%) - percentage
+   heights need a *definite* parent height, and #detail-split only has a
+   min-height now (so the row can grow with the description), which made
+   height:70% silently resolve to nothing and the divider disappear. */
+#detail-divider { width: 1px; align-self: stretch; margin: 16px 0; background: var(--border-color); flex-shrink: 0; }
+.comments-heading { margin-top: 16px; }
+
+/* ---------- Card detail: description rich-text toolbar ---------- */
+.rte-toolbar { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; flex-wrap: wrap; }
+.rte-btn {
+  background: var(--bg-hover); border: 1px solid var(--border-color); color: var(--text-secondary);
+  border-radius: 4px; padding: 4px 8px; font-size: 12px; font-family: inherit; cursor: pointer; line-height: 1.2;
+}
+.rte-btn:hover { background: var(--bg-hover-strong); }
+.rte-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rte-btn:disabled { opacity: 0.4; cursor: default; }
+.rte-btn:disabled:hover { background: var(--bg-hover); }
+.rte-sep { width: 1px; height: 18px; background: var(--border-color); margin: 0 3px; }
+#rte-font-size-dec, #rte-font-size-inc { font-weight: 700; padding: 4px 9px; }
+.rte-btn[data-heading="BLOCKQUOTE"] { font-size: 15px; font-weight: 700; }
+
+/* ---------- Settings ---------- */
+.settings-section { margin-top: 4px; margin-bottom: 16px; }
+.settings-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.settings-path-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-family: Consolas, monospace;
+  word-break: break-all;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+.settings-hint { font-size: 12px; color: var(--text-muted); line-height: 1.6; margin: 0; }
+
+/* ---------- About ---------- */
+.about-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); }
+.about-label { color: var(--text-muted); }
+.about-value { color: var(--text-primary); font-weight: 600; }
+.about-block { margin-top: 16px; }
+.about-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.about-list li + li { margin-top: 4px; }
+
+.swatch-option-row { display: flex; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.theme-option, .pattern-option {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.theme-option:hover, .pattern-option:hover { background: var(--bg-hover); }
+.option-selected { border-color: var(--accent); color: var(--text-primary); background: var(--bg-hover); font-weight: 600; }
+
+.danger-btn {
+  width: 100%;
+  background: #7a2b2b;
+  color: #fff;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ---------- Board background modal ---------- */
+#background-preview-wrap {
+  width: 100%;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+}
+#background-preview { width: 100%; height: 100%; background-size: cover; background-position: center; }
+#background-choose-btn { margin-bottom: 10px; }
+#background-remove-btn { margin-bottom: 12px; }
+#background-blur-row { margin-bottom: 12px; }
+#background-blur-row input[type="range"] { width: 100%; margin-top: 6px; }
+#background-close-bottom { margin-top: 4px; }
+
+/* ---------- Labels on card detail ---------- */
+/* .labels-row-top (Labels button + Mark as Complete) used to be flattened
+   into this same flex-wrap row as the label pills themselves - with enough
+   labels to wrap the pills onto a second line, Mark as Complete (being a
+   short item in that same wrapping flex line) visibly drifted down/
+   sideways instead of staying anchored top-right. Splitting them into two
+   stacked rows means the pills can wrap into as many lines as they need
+   without ever touching the top row's layout. */
+.labels-row { margin-bottom: 12px; }
+.labels-row-top { display: flex; align-items: center; gap: 8px; }
+#detail-labels-pills:not(:empty) { margin-top: 8px; }
+.labels-add-btn {
+  flex-shrink: 0;
+  background: var(--bg-hover-strong);
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.labels-add-btn:hover { filter: brightness(1.15); }
+#about-btn { text-align: center; }
+.labels-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.label-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 6px 3px 9px; border-radius: 5px; }
+.label-pill-remove { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0; line-height: 1; opacity: 0.7; }
+.label-pill-remove:hover { opacity: 1; }
+
+/* ---------- Due date fields ---------- */
+.due-date-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.due-date-row input[type="date"], .due-date-row input[type="time"] {
+  /* Chromium renders a native time input ~2-3px taller than a date input
+     even with identical padding/font-size (its AM/PM segment needs more
+     intrinsic height) - an explicit height keeps the row from growing the
+     instant the time input is revealed. */
+  flex: none; height: 31px; padding: 6px; border-radius: 6px;
+  border: 1px solid var(--border-color); background: var(--bg-input);
+  color: var(--text-primary); font-size: 13px; cursor: pointer;
+  box-sizing: border-box;
+}
+/* Widths sized to each input's own shrink-to-fit content (measured live:
+   ~121px/~104px) plus a small buffer - not shared, since the date and time
+   segments genuinely need different amounts of room. */
+.due-date-row input[type="date"] { width: 128px; }
+.due-date-row input[type="time"] { width: 112px; }
+.time-toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.clear-due-btn { background: var(--bg-hover-strong); border: none; color: var(--text-secondary); border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.time-confirm-btn { background: var(--accent); border: none; color: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.85); cursor: pointer; }
+:root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator,
+:root[data-theme="lavender"] input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-theme="lavender"] input[type="time"]::-webkit-calendar-picker-indicator { filter: none; }
+
+/* ---------- Checklist ---------- */
+.checklist-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.checklist-item span { flex: 1; font-size: 13px; }
+.checklist-item .checklist-drag-handle { flex: 0 0 auto; cursor: grab; color: var(--text-faint); font-size: 13px; padding: 2px; }
+.checklist-done { text-decoration: line-through; color: var(--text-muted); }
+.checklist-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; }
+.checklist-item-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; box-shadow: 0 6px 16px rgba(0,0,0,0.5); margin: 0; background: var(--bg-card); padding: 4px 6px; border-radius: 6px; }
+.checklist-item-dragging-source { opacity: 0.3; }
+.checklist-item-drop-indicator { height: 2px; background: var(--accent); border-radius: 1px; margin-bottom: 6px; }
+.checklist-add-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; margin-bottom: 20px; }
+.checklist-add-row input { margin-bottom: 0; flex: 1; }
+.checklist-add-row button { background: var(--bg-hover-strong); border: none; color: var(--text-secondary); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+
+/* ---------- Comments ---------- */
+.comment-item { background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 8px 8px; margin-bottom: 8px; }
+.comment-header { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 4px; }
+.comment-actions { display: flex; gap: 6px; }
+.comment-actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px; padding: 0; }
+.comment-actions button:hover { color: var(--text-primary); }
+.comment-timestamp { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
+.comment-text { font-size: 13px; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+.comment-edit-input { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-family: inherit; font-size: 13px; }
+.comment-add-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.comment-add-row input { margin-bottom: 0; flex: 1; }
+.comment-add-row button { background: var(--bg-hover-strong); border: none; color: var(--text-secondary); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.modal-buttons { display: flex; justify-content: flex-start; gap: 8px; margin-top: 14px; }
+#detail-delete, #detail-archive { background: none; border: none; color: var(--text-faint); padding: 6px 4px; cursor: pointer; font-size: 13px; }
+#detail-delete:hover, #detail-archive:hover { color: var(--text-muted); }
+
+/* ---------- Context menu / popovers ---------- */
+#context-menu {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); min-width: 170px;
+}
+#context-menu button {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text-primary);
+  padding: 8px 12px; cursor: pointer; font-size: 13px; border-radius: 4px;
+}
+#context-menu button:hover { background: var(--bg-hover); }
+#context-menu button.has-submenu { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.submenu-arrow { color: var(--text-faint); font-size: 12px; }
+
+#context-submenu {
+  position: fixed; z-index: 2001;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); min-width: 140px;
+  display: flex; flex-direction: column;
+}
+#context-submenu button {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; text-align: left;
+  background: none; border: none; color: var(--text-primary);
+  padding: 7px 10px; cursor: pointer; font-size: 13px; border-radius: 4px;
+}
+#context-submenu button:hover { background: var(--bg-hover); }
+#context-submenu.context-submenu-labels {
+  width: 200px; min-width: 0; max-height: 260px; overflow-y: auto; padding: 8px;
+}
+.submenu-swatch { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; border: 1px solid var(--border-color); }
+.submenu-swatch-custom { border-radius: 50%; }
+
+#custom-color-panel {
+  position: fixed; z-index: 2500; width: 170px;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#ccp-sv-square {
+  position: relative; width: 100%; height: 110px; border-radius: 6px; cursor: crosshair;
+  background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);
+}
+#ccp-sv-thumb {
+  position: absolute; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.6);
+  transform: translate(-50%, -50%); pointer-events: none;
+}
+#ccp-hue-slider {
+  position: relative; width: 100%; height: 12px; border-radius: 6px; cursor: pointer;
+  background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red);
+}
+#ccp-hue-thumb {
+  position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.6);
+  transform: translate(-50%, -50%); pointer-events: none;
+}
+#ccp-bottom-row { display: flex; align-items: center; gap: 6px; }
+#ccp-preview { width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; border: 1px solid var(--border-color); }
+#ccp-hex-input {
+  flex: 1; min-width: 0; background: var(--bg-hover); border: 1px solid var(--border-color);
+  border-radius: 6px; color: var(--text-primary); padding: 5px 6px; font-size: 12px;
+}
+#custom-color-panel-confirm {
+  background: var(--accent); border: none; color: #fff;
+  padding: 7px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;
+}
+
+#due-date-popover {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); width: 220px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+#due-date-popover input[type="date"], #due-date-popover input[type="time"] {
+  width: 100%; padding: 6px; border-radius: 6px;
+  border: 1px solid var(--border-color); background: var(--bg-input);
+  color: var(--text-primary); font-size: 13px; cursor: pointer;
+}
+.popover-buttons { display: flex; gap: 8px; }
+.popover-buttons button { flex: 1; padding: 6px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+#popover-clear { background: #7a2b2b; color: #fff; }
+#popover-close { background: var(--accent); color: #fff; }
+
+#completion-popover {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 12px 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); width: 220px;
+}
+.completion-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; color: var(--text-primary); }
+.completion-overall { font-weight: 600; }
+.completion-divider { height: 1px; background: var(--border-color); margin: 6px 0; }
+
+/* ---------- Label picker popover ---------- */
+#label-picker-popover {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); width: 200px; max-height: 260px; overflow-y: auto;
+}
+.label-picker-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 5px; cursor: pointer; font-size: 13px; color: var(--text-primary); }
+.label-picker-row:hover { background: var(--bg-hover); }
+.label-picker-name { flex: 1; }
+.label-picker-empty { font-size: 12px; color: var(--text-muted); padding: 8px 4px; }
+.label-picker-manage-btn { width: 100%; margin-top: 6px; background: var(--bg-hover-strong); border: none; color: var(--text-secondary); padding: 7px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+
+/* ---------- Emoji slot (add-card / add-column rows) ---------- */
+.emoji-slot-btn {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.emoji-slot-btn:hover { background: var(--bg-hover); }
+.emoji-slot-btn.is-placeholder { opacity: 0.4; }
+
+/* Flag emoji render as a bundled icon (Windows' system emoji font has no
+   flag glyphs) - sized off font-size so it drops into any context (title
+   emoji, label pills, picker grid, etc.) at the right size automatically. */
+.emoji-flag-icon { width: 1em; height: 1em; vertical-align: -0.15em; }
+
+/* ---------- Title emoji (already-set card/column titles) ---------- */
+.title-emoji {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  margin-right: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.title-emoji:hover { outline: 1px solid var(--border-color); }
+.title-emoji:hover .title-emoji-glyph { opacity: 0.25; }
+.title-emoji-edit-overlay {
+  display: none;
+  position: absolute; inset: 0;
+  align-items: center; justify-content: center;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+.title-emoji:hover .title-emoji-edit-overlay { display: flex; }
+
+/* Column title emoji reads noticeably bigger than the card-title one. */
+.column-title .title-emoji { width: 30px; height: 30px; font-size: 21px; }
+.column-title .title-emoji .title-emoji-edit-overlay { font-size: 15px; }
+
+/* ---------- Column title: hover-to-reveal "add emoji" slot ---------- */
+/* Width (not just opacity) collapses to 0 at rest, so a column with no emoji
+   yet has no reserved gap - it only opens up once you hover the title row. */
+.column-title-row .column-emoji-hover-btn {
+  width: 0; height: 20px;
+  overflow: hidden;
+  border: none; background: transparent; padding: 0;
+  font-size: 14px; border-radius: 4px; margin-right: 0;
+  flex-shrink: 0;
+  opacity: 0; pointer-events: none;
+  transition: width 0.15s ease, margin-right 0.15s ease, opacity 0.15s ease;
+}
+.column-title-row:hover .column-emoji-hover-btn { width: 20px; margin-right: 6px; opacity: 0.4; pointer-events: auto; }
+.column-emoji-hover-btn:hover { opacity: 0.75 !important; background: var(--bg-hover); }
+
+/* ---------- Emoji picker popover ---------- */
+#emoji-picker-popover {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); width: 260px;
+}
+.emoji-picker-tabs {
+  display: flex; flex-wrap: nowrap; gap: 4px; margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: thin; scrollbar-color: var(--border-color) transparent;
+}
+.emoji-picker-tabs::-webkit-scrollbar { height: 6px; }
+.emoji-picker-tabs::-webkit-scrollbar-track { background: transparent; }
+.emoji-picker-tabs::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
+.emoji-picker-tab { flex-shrink: 0; background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 6px; opacity: 0.45; }
+.emoji-picker-tab:hover { opacity: 1; }
+.emoji-picker-tab.active { opacity: 1; background: var(--bg-hover); }
+/* Capped to exactly 4 rows (20 emoji, each a fixed 34px .emoji-picker-item)
+   so the popover's own size never grows with a tab's emoji count - a tab
+   with more than 20 scrolls internally instead. */
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  max-height: calc(4 * 34px + 3 * 4px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Reserves the scrollbar's gutter unconditionally, even on a tab with
+     exactly 20 (no actual overflow) - otherwise a >20-emoji tab's grid gets
+     a few px narrower once its scrollbar appears, visibly shifting every
+     emoji's position relative to a non-scrolling tab. */
+  scrollbar-gutter: stable;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+.emoji-picker-grid::-webkit-scrollbar { width: 6px; }
+.emoji-picker-grid::-webkit-scrollbar-track { background: transparent; }
+.emoji-picker-grid::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
+/* Fixed height (not padding-driven) so every item is the exact same height
+   whether it holds a text glyph or a flag <img> - a tab mixing both (e.g.
+   Flags: 19 flag images + one plain-text 🎏) previously produced a
+   slightly taller last row than the row height measured from row 1,
+   letting a hair of overflow sneak in and show a scrollbar. */
+.emoji-picker-item { background: none; border: none; cursor: pointer; font-size: 18px; height: 34px; padding: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.emoji-picker-item:hover { background: var(--bg-hover); }
+.emoji-picker-clear { width: 100%; margin-top: 8px; background: var(--bg-hover-strong); border: none; color: var(--text-secondary); padding: 7px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.emoji-picker-clear:hover { filter: brightness(1.15); }
+
+/* ---------- Confirm / input popup ---------- */
+#confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 2500;
+}
+#confirm-box { background: var(--bg-modal); color: var(--text-primary); padding: 20px; border-radius: 10px; width: 280px; }
+#confirm-box p { margin: 0 0 14px; font-size: 14px; line-height: 1.4; }
+#confirm-cancel { background: var(--bg-hover-strong); color: var(--text-secondary); }
+#confirm-delete { background: #7a2b2b; color: #fff; }
+#input-popover-field {
+  width: 100%; padding: 7px; border-radius: 6px;
+  border: 1px solid var(--border-color); background: var(--bg-input);
+  color: var(--text-primary); margin-bottom: 12px; font-size: 13px; font-family: inherit;
+}
+#input-popover-cancel { background: var(--bg-hover-strong); color: var(--text-secondary); }
+#input-popover-ok { background: var(--accent); color: #fff; }
+
+/* ---------- Calendar view ---------- */
+/* Extra top clearance so the corner close button doesn't overlap the nav
+   row (prev/next arrows), which - unlike most modals - starts immediately
+   at the top with no heading above it to push it down naturally. */
+#calendar-modal { width: 360px; padding-top: 42px; }
+.calendar-header { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 12px; }
+.calendar-header button { background: none; border: none; color: var(--text-secondary); font-size: 16px; cursor: pointer; }
+#calendar-month-label { font-size: 14px; font-weight: 600; min-width: 130px; text-align: center; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; }
+.calendar-dow { text-align: center; font-size: 11px; color: var(--text-muted); padding: 4px 0; }
+.calendar-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 6px; font-size: 12px; color: var(--text-secondary); }
+.calendar-cell-empty { visibility: hidden; }
+.calendar-today { outline: 1px solid var(--accent); }
+.calendar-has-items { cursor: pointer; background: var(--bg-hover); }
+.calendar-has-items:hover { background: var(--bg-hover-strong); }
+.calendar-dot-row { display: flex; gap: 2px; margin-top: 2px; }
+.calendar-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+/* Distinguishes the board's own due date from card due dates at a glance,
+   both in the mini month-grid dots and in the day's task list. */
+.calendar-dot-board { background: #f08c00; }
+.calendar-day-panel { border-top: 1px solid var(--border-color); padding-top: 10px; }
+.calendar-day-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.calendar-day-item { background: var(--bg-card); border-radius: 6px; padding: 8px; margin-bottom: 6px; }
+.calendar-day-item-board { border-left: 3px solid #f08c00; }
+.calendar-day-item-title { font-size: 13px; }
+.calendar-day-item-col { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.calendar-day-empty { font-size: 12px; color: var(--text-faint); }
+
+/* ---------- Labels management panel ---------- */
+/* Capped shorter than other modals, and turned into a flex column so only
+   #labels-list scrolls - the add-label controls at the bottom (divider,
+   emoji slot, name input, swatches, button) stay put. */
+#labels-modal {
+  width: 380px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+}
+#labels-modal > h4 { flex-shrink: 0; }
+/* No flex-grow/flex-basis here: #labels-modal sizes to its content (capped
+   by max-height, not a fixed height), so `flex: 1 1 0` would make this
+   collapse toward zero instead of its actual content size. Plain
+   `overflow-y: auto` already grants it automatic-minimum-size: 0, which is
+   all it needs to shrink and scroll once the modal's cap is actually hit. */
+#labels-list { flex-shrink: 1; overflow-y: auto; }
+.label-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.label-swatch-static { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; border: 1px solid var(--border-color); }
+.label-name { flex: 1; font-size: 13px; position: relative; top: -1px; cursor: text; padding: 2px 4px; border-radius: 4px; }
+.label-name:hover { background: var(--bg-hover); }
+.label-name-edit-input {
+  flex: 1; font-size: 13px; padding: 2px 4px; border-radius: 4px;
+  border: 1px solid var(--accent); background: var(--bg-input); color: var(--text-primary); font-family: inherit;
+}
+.label-delete { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; }
+.label-delete:hover { color: #f55; }
+.labels-empty { font-size: 12px; color: var(--text-faint); padding: 6px 0 12px; }
+#labels-add-row { flex-shrink: 0; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+#label-name-row { margin-bottom: 8px; }
+#label-name-input {
+  width: 100%; padding: 7px; border-radius: 6px;
+  border: 1px solid var(--border-color); background: var(--bg-input);
+  color: var(--text-primary); font-size: 13px;
+}
+#label-name-row #label-name-input { flex: 1; min-width: 0; margin-bottom: 0; }
+#label-color-swatches { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.label-swatch { width: 20px; height: 20px; border-radius: 5px; border: 2px solid var(--border-color); cursor: pointer; padding: 0; }
+.label-swatch-selected { border-color: var(--text-primary); }
+.label-swatch-custom { position: relative; border-radius: 50%; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); overflow: hidden; }
+#label-add-btn { width: 100%; background: var(--accent); border: none; color: #fff; padding: 7px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+/* ---------- Label templates: collapsed tab + pull-out panel ----------
+   Both are `position: fixed`, positioned in JS off #labels-modal's own
+   live rect (see positionLabelTemplatesUI) - #labels-modal stays a plain
+   flex child of #labels-overlay, so it keeps its original true-center
+   placement exactly as before. */
+#label-templates-tab {
+  position: fixed;
+  z-index: 1501;
+  display: flex; align-items: center;
+  height: 40px;
+  max-width: 30px;
+  overflow: hidden;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 0 8px 8px 8px;
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 15px;
+  white-space: nowrap;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+  transition: max-width 0.18s ease;
+}
+#label-templates-tab:hover { max-width: 200px; }
+#label-templates-tab .tab-label { margin-left: 8px; font-size: 13px; font-weight: 600; }
+#label-templates-panel {
+  position: fixed;
+  z-index: 1501;
+  width: 300px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-modal);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+#label-templates-header {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 12px 14px;
+}
+#label-templates-collapse {
+  flex-shrink: 0; background: rgba(255,255,255,0.15); border: none; color: #fff;
+  font-size: 13px; font-weight: 700; cursor: pointer; padding: 3px 7px; border-radius: 5px;
+}
+#label-templates-collapse:hover { background: rgba(255,255,255,0.28); }
+/* Same reasoning as #labels-list above: #label-templates-panel sizes to its
+   content (capped by max-height, not a fixed height), so this must NOT use
+   flex-grow/flex-basis - it should size to its own content and only shrink
+   (via its own overflow-y:auto) once the panel's max-height is actually hit. */
+#label-templates-body { flex-shrink: 1; padding: 12px 14px; overflow-y: auto; }
+.template-category { margin-bottom: 2px; }
+.template-category-header { display: flex; align-items: center; gap: 6px; }
+.template-category-toggle {
+  flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+  color: var(--text-primary); font-size: 13px; font-weight: 600; padding: 6px 4px; border-radius: 4px;
+}
+.template-category-toggle:hover { background: var(--bg-hover); }
+.template-category-arrow { display: inline-block; width: 10px; color: var(--text-faint); }
+.template-category-addall {
+  flex-shrink: 0; background: none; border: none; cursor: pointer;
+  color: var(--accent); font-size: 12px; font-weight: 600; padding: 4px;
+}
+.template-category-addall:hover { text-decoration: underline; }
+.template-category-items { padding: 0 4px 8px 22px; display: flex; flex-direction: column; gap: 2px; }
+.template-item-row { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-radius: 4px; }
+.template-item-row:hover { background: var(--bg-hover); }
+.template-item-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border-color); }
+.template-item-name { flex: 1; font-size: 12px; color: var(--text-secondary); }
+.template-item-add {
+  flex-shrink: 0; background: var(--bg-hover-strong); border: none; cursor: pointer;
+  color: var(--text-secondary); font-size: 11px; padding: 3px 7px; border-radius: 5px;
+}
+.template-item-add:hover { filter: brightness(1.15); }
+
+/* ---------- Upcoming sidebar ---------- */
+#upcoming-sidebar {
+  position: fixed; top: 52px; right: 0; width: 280px; height: calc(100vh - 52px);
+  background: var(--bg-sidebar); border-left: 1px solid var(--border-subtle);
+  z-index: 1200; display: flex; flex-direction: column; padding: 14px; overflow-y: auto;
+}
+.upcoming-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 14px; font-weight: 600; }
+.upcoming-header .modal-close-btn { position: static; }
+.upcoming-item { background: var(--bg-card); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.upcoming-item-title { font-size: 13px; margin-bottom: 4px; }
+.upcoming-item-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); }
+.upcoming-empty { font-size: 12px; color: var(--text-faint); }
+
+/* ---------- Archived cards / boards ---------- */
+.archived-search-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.archived-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+.archived-card-tile {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.archived-card-title { font-size: 13px; font-weight: 700; color: var(--text-primary); word-break: break-word; }
+.archived-card-meta { font-size: 11px; color: var(--text-muted); }
+.archived-card-actions { display: flex; gap: 6px; margin-top: 4px; }
+.archived-card-actions button {
+  flex: 1;
+  background: var(--bg-hover-strong);
+  border: none;
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 5px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.archived-card-actions button:hover { filter: brightness(1.15); }
+.danger-action:hover { background: #7a2b2b !important; color: #fff !important; filter: none !important; }
+.archived-empty { font-size: 13px; color: var(--text-faint); padding: 10px 0; grid-column: 1 / -1; }
+
+.archived-boards-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.archived-boards-row:hover { background: var(--bg-hover); }
+.archived-boards-row-name { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archived-boards-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.archived-boards-row-actions button {
+  background: var(--bg-hover-strong);
+  border: none;
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.archived-boards-row-actions button:hover { filter: brightness(1.15); }
+
+/* ---------- Pomodoro timer ---------- */
+/* Same reasoning as #calendar-modal: the Tomato/Cow row starts right at
+   the top with no heading above it, so it needs extra clearance from the
+   corner close button or it visibly overlaps the Cow button's corner. */
+#pomodoro-modal { width: 340px; text-align: center; padding-top: 42px; }
+#pomodoro-mode-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
+.pomo-mode-btn {
+  flex: 1;
+  background: var(--bg-hover-strong);
+  border: none;
+  color: var(--text-secondary);
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+.pomo-mode-btn:hover { filter: brightness(1.15); }
+.pomo-mode-btn.pomo-mode-active { background: var(--accent); color: #fff; }
+#pomodoro-phase-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+#pomodoro-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  margin: 0 auto 14px;
+}
+
+#pomo-ring-wrap { position: relative; width: 180px; height: 180px; }
+/* Registering --pomo-progress as an animatable <number> (rather than an
+   ordinary custom property, which browsers only ever swap instantly) is
+   what lets the conic-gradient's angle transition smoothly instead of
+   jumping once per tick - see setPomoRingProgress() in main.js. */
+@property --pomo-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+#pomo-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  --pomo-progress: 0;
+  --pomo-ring-color: #e8590c;
+  background: conic-gradient(var(--pomo-ring-color) calc(var(--pomo-progress) * 1%), var(--bg-hover-strong) 0);
+  transition: --pomo-progress 1s linear;
+}
+#pomo-ring.pomo-instant { transition: none; }
+#pomo-ring-inner {
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: var(--bg-modal);
+}
+
+/* Cow mode: the actual 🥛 emoji, stacked twice at identical fixed size/
+   position - a faded base copy, and a full-opacity copy revealed via
+   clip-path from the bottom up. clip-path percentages are relative to
+   THIS element's own box, and centering the glyph in a fixed-size box
+   (rather than bottom-anchoring it in a *variable*-height flex container,
+   which is what the first attempt did) keeps its ink filling that box
+   edge-to-edge - confirmed empirically by rendering both versions and
+   comparing: the variable-height version left most of the box as empty
+   font padding, revealing almost nothing until near 100%. */
+#pomo-milk-wrap { position: relative; width: 170px; height: 170px; }
+#pomo-milk-base, #pomo-milk-fill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#pomo-milk-base span, #pomo-milk-fill span { font-size: 130px; line-height: 1; }
+#pomo-milk-base { opacity: 0.22; filter: grayscale(0.5); }
+#pomo-milk-fill {
+  clip-path: inset(100% 0 0 0);
+  transition: clip-path 0.9s linear;
+}
+#pomo-milk-fill.pomo-instant { transition: none; }
+
+#pomodoro-time-display-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+/* In cow mode the digits sit above the glass in normal flow instead
+   (overlaying them on an emoji that now fills its box edge-to-edge, per
+   the redesign above, would just sit on top of the milk illegibly). */
+#pomodoro-modal.pomo-cow-active #pomodoro-visual { flex-direction: column; height: auto; gap: 12px; }
+#pomodoro-modal.pomo-cow-active #pomodoro-time-display-wrap { position: static; transform: none; order: -1; }
+
+#pomodoro-digit-row { display: flex; align-items: center; gap: 3px; }
+/* Plain bold digits, same look as the original single "25:00" text - a
+   thin underline is the only hint these are separately editable, and it
+   disappears entirely while running so it reads as plain text then (no
+   tile background, no color swap, nothing that looks "different" between
+   states - the previous version's jarring click-to-edit and the fixed-
+   color tile background both came from swapping to a visually distinct
+   element/style; these inputs never change shape). Typing a digit
+   auto-advances to the next field, like a PIN/auth-code input.  */
+.pomo-digit-input {
+  width: 20px;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  text-align: center;
+  padding: 2px 0;
+  cursor: text;
+}
+.pomo-digit-input:not(:disabled) { border-bottom-color: var(--border-color); }
+.pomo-digit-input:not(:disabled):hover,
+.pomo-digit-input:not(:disabled):focus { border-bottom-color: var(--accent); outline: none; }
+.pomo-digit-input:disabled { cursor: default; }
+.pomo-digit-sep { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+
+/* Plan-level settings (break lengths, session count, long-break cadence) -
+   a small bordered card of label/value rows, each value ending in an
+   explicit unit ("min", "sessions") so it's never ambiguous what's being
+   adjusted - only editable before the plan has been started. Deliberately
+   styled distinctly from the big focus-timer digits above (a quieter,
+   compact settings list) rather than echoing their bare-number look,
+   which read as unlabeled and unclear. */
+/* Grid (not flex-per-row) so the number column lines up across all 4 rows
+   regardless of label length - the flex "space-between per row" version
+   let "Sessions" (no unit after it) and "Long break every ... sessions"
+   (a long unit) push their numbers to different horizontal positions. */
+#pomodoro-plan-settings {
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  column-gap: 8px;
+  row-gap: 5px;
+  align-items: baseline;
+}
+.pomo-plan-row, .pomo-plan-value { display: contents; }
+.pomo-plan-label { font-size: 12px; color: var(--text-secondary); }
+.pomo-plan-unit { font-size: 11px; color: var(--text-faint); justify-self: start; }
+.pomo-plan-input {
+  width: 26px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  text-align: center;
+  padding: 1px 0;
+  cursor: text;
+  justify-self: end;
+}
+.pomo-plan-input:not(:disabled) { border-bottom-color: var(--border-color); }
+.pomo-plan-input:not(:disabled):hover, .pomo-plan-input:not(:disabled):focus { border-bottom-color: var(--accent); outline: none; }
+.pomo-plan-input:disabled { cursor: default; }
+
+/* A plain child of the grid (not display:contents like .pomo-plan-row),
+   so it needs an explicit column span to sit under all three columns
+   instead of only occupying the first one via auto-placement. */
+#pomo-persist-settings-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 3px;
+  cursor: pointer;
+}
+#pomo-persist-settings-row input[type="checkbox"] { margin: 0; cursor: pointer; }
+
+#pomodoro-session-count { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+
+#pomodoro-controls { display: flex; gap: 8px; justify-content: center; }
+/* flex:1 (not the old fixed padding, sized fine for 2 buttons) - now that
+   Skip sits between Start/Pause and Reset, three buttons need to share
+   the row's width evenly rather than each sizing to its own text. */
+#pomodoro-toggle-btn, #pomodoro-skip-btn, #pomodoro-reset-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+#pomodoro-toggle-btn { background: var(--accent); color: #fff; font-weight: 600; }
+#pomodoro-toggle-btn:hover { filter: brightness(1.1); }
+#pomodoro-skip-btn, #pomodoro-reset-btn { background: var(--bg-hover-strong); color: var(--text-secondary); }
+#pomodoro-skip-btn:hover, #pomodoro-reset-btn:hover { filter: brightness(1.15); }
+/* Disabled (not hidden) before a session's started - nothing to skip yet,
+   but keeping it in place avoids the row reflowing/hiding a control the
+   user just saw. Same "disable in place" pattern used elsewhere in this
+   modal (plan inputs while started, digit inputs while running). */
+#pomodoro-skip-btn:disabled { opacity: 0.4; cursor: default; }
+#pomodoro-skip-btn:disabled:hover { filter: none; }
+
+/* Hover popover on the header timer button - quick actions without opening
+   the full panel. */
+#pomo-hover-popover {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); min-width: 130px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+#pomo-hover-popover button {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text-primary);
+  padding: 7px 10px; cursor: pointer; font-size: 13px; border-radius: 4px; font-family: inherit;
+}
+#pomo-hover-popover button:hover { background: var(--bg-hover); }
+/* Not a <button> on purpose - purely informational, no click behavior, so
+   it shouldn't pick up the hover/cursor affordance the real buttons above
+   it have. */
+#pomo-hover-info {
+  padding: 7px 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Floating board-corner overlay while a session is active - a smaller
+   echo of the modal's own ring/milk visuals, not interactive (pointer-
+   events:none) so it never blocks clicking cards underneath it.
+   Briefly tried moving the phase/session-count text below this whole
+   circle (a taller flex-column overlay) - reverted per explicit feedback:
+   the image itself needs to stay exactly where it was, with that text
+   fitted inside the circle below the time instead (see #pomo-board-label
+   below). */
+#pomo-board-overlay {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 118px;
+  height: 118px;
+  z-index: 100;
+  pointer-events: none;
+}
+#pomo-board-tomato-wrap { position: absolute; inset: 0; }
+@property --pomo-board-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+#pomo-board-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  --pomo-board-progress: 0;
+  --pomo-board-ring-color: #e8590c;
+  background: conic-gradient(var(--pomo-board-ring-color) calc(var(--pomo-board-progress) * 1%), rgba(255, 255, 255, 0.18) 0);
+  transition: --pomo-board-progress 1s linear;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+#pomo-board-ring.pomo-instant { transition: none; }
+/* Black background is per the user's mockup, deliberately NOT theme-
+   colored (unlike the ring, which reuses the same phase colors as the
+   modal's ring and so already adapts to whatever's active). */
+#pomo-board-ring-inner {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Was the live 🍅 glyph, sized/nudged by trial and error - abandoned after
+   two rounds of tuning against Chrome (the only engine previewable from
+   here) didn't hold up in the real app, because Chrome bundles its own
+   emoji font while WebView2 renders through Windows' native one: same
+   glyph, two different font files, different metrics. Now the actual
+   Microsoft Fluent 3D tomato (assets/emoji/1f345-fluent.png) as a plain
+   <img> - the style the user is actually used to seeing system-wide on
+   Windows - same technique already used for flag emoji in this app
+   (FLAG_EMOJI_ICONS): image rendering is consistent between Chrome and
+   WebView2 (both Chromium-based) in a way live emoji-font glyphs are not,
+   so what's verified here is what actually ships.
+   The downloaded PNG's own canvas wasn't centered on its artwork (a
+   canvas alpha-scan found the tomato's visible pixels spanning y=40..240
+   of a 256px-tall square - 40px of empty space above vs only 15px below),
+   which is why it kept reading as "low in the circle" no matter how this
+   element itself was centered. Fixed at the asset level: re-cropped to
+   the artwork's true alpha bounding box and re-padded into a new square
+   canvas with equal margin on all sides, replacing the original file -
+   so plain centering here now actually centers the visible tomato. */
+#pomo-board-tomato-emoji { width: 104px; height: 104px; object-fit: contain; }
+
+#pomo-board-milk-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+#pomo-board-milk-base, #pomo-board-milk-fill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+#pomo-board-milk-base span, #pomo-board-milk-fill span {
+  font-size: 92px;
+  line-height: 1;
+  /* Stacked drop-shadows fake an outline around the glyph (a real emoji
+     is colored bitmap/COLR data - -webkit-text-stroke doesn't apply to
+     it), for the "dark outline instead of a filled background" look. */
+  filter: drop-shadow(1.5px 0 0 rgba(0, 0, 0, 0.6)) drop-shadow(-1.5px 0 0 rgba(0, 0, 0, 0.6))
+    drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 -1.5px 0 rgba(0, 0, 0, 0.6));
+}
+#pomo-board-milk-base { opacity: 0.3; filter: grayscale(0.4); }
+#pomo-board-milk-fill {
+  clip-path: inset(100% 0 0 0);
+  transition: clip-path 0.9s linear;
+}
+#pomo-board-milk-fill.pomo-instant { transition: none; }
+
+/* Time + phase/session-count, stacked and both centered in the same
+   inset:0 overlay on top of the tomato/milk art - the phase/count line
+   was briefly pulled out into its own row below the circle, then put back
+   here per explicit feedback ("directly below the timer text WITHIN the
+   overlay image"). Small font + tight line-height since the two lines
+   share the same ~102px circle the countdown alone used to have. */
+#pomo-board-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 8px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.6);
+  /* Geometric center of the circle sits right at the tomato's leaves, not
+     its red face - nudged down a few px so the (now two-line) text reads
+     over the red body instead of fighting the leaves for space. */
+  transform: translateY(8px);
+}
+#pomo-board-time { font-size: 14px; font-weight: 800; line-height: 1.15; }
+/* Cleared to empty text (not hidden) during the celebration window - by
+   then workSessionsCompleted/phase are already reset for the next fresh
+   plan, so rendering it normally would show a stale/misleading value
+   ("FOCUS 1 / 4") right under "Great job!". */
+#pomo-board-session-info {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 1px;
+}
+/* Quick pause/skip/reset without opening the header hover popover -
+   requested after the user found themselves instinctively clicking the
+   overlay itself for this. The rest of #pomo-board-overlay stays
+   pointer-events:none (so it never blocks clicking a card underneath it)
+   - only this row opts back into pointer-events:auto. No visible button
+   shape/background - just the bare dark red/gray symbols (the 16px box is
+   still the click target, kept tappable-sized, it's just invisible) - a
+   background pill was tried first and explicitly rejected as too much
+   visual weight on top of the art. Which tint applies is driven by
+   .pomo-cow-active on the overlay itself, same pattern as #pomodoro-modal. */
+#pomo-board-controls {
+  display: flex;
+  gap: 2px;
+  margin-top: 3px;
+  pointer-events: auto;
+}
+/* The 16px box is the hit target, not the visible symbol size - kept as-is
+   (and the row's gap only trimmed slightly, not removed) so tightening the
+   symbols up doesn't also shrink or overlap the actual click targets. */
+#pomo-board-controls button {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  background: none;
+  color: #7a1414;
+  text-shadow: none; /* the white text-shadow inherited from #pomo-board-label above is tuned for white text - invisible/pointless on dark red or gray glyphs */
+}
+#pomo-board-controls button:hover { color: #a51c1c; }
+#pomo-board-controls svg { width: 11px; height: 11px; }
+/* Darker than the tomato-mode red above needs to be - the milk glass art
+   is a light/medium gray itself, so a matching mid-gray icon (tried first)
+   was essentially invisible against it. Near-black (tried next) fixed
+   visibility but read as too heavy/black rather than "dark gray" - this
+   sits between the two. */
+#pomo-board-overlay.pomo-cow-active #pomo-board-controls button { color: #45454c; }
+#pomo-board-overlay.pomo-cow-active #pomo-board-controls button:hover { color: #5c5c66; }
