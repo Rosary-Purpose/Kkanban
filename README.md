@@ -21,7 +21,7 @@ A desktop kanban board built with [Tauri](https://tauri.app/) — vanilla HTML/C
 
 | Card detail | Pomodoro timer | Lavender theme |
 | --- | --- | --- |
-| ![Card detail view with rich-text description and checklist](docs/screenshots/card-detail.png) | ![Pomodoro timer panel](docs/screenshots/pomodoro.png) | ![Board in the Lavender theme](docs/screenshots/lavender-theme.png) |
+| ![Card detail view with rich-text description and checklist](docs/screenshots/card-detail.png) | ![Pomodoro timer panel](docs/screenshots/pomodoro.png) | ![Board in the Lavender theme with the dotted background pattern](docs/screenshots/lavender-theme.png) |
 
 ## Tech stack
 
