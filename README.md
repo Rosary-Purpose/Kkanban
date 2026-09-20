@@ -2,6 +2,8 @@
 
 A desktop kanban board built with [Tauri](https://tauri.app/) — vanilla HTML/CSS/JS on the frontend, a small Rust backend for local persistence. Built as a personal project to learn Tauri and to have a kanban tool that actually works the way I want it to.
 
+![Board view](docs/screenshots/board.png)
+
 ## Features
 
 - **Boards & columns** — multiple boards, drag-and-drop reordering of both columns and cards
@@ -14,6 +16,12 @@ A desktop kanban board built with [Tauri](https://tauri.app/) — vanilla HTML/C
 - **Themes** — Dark, Light, Lavender, and a seasonal Christmas theme, plus optional background patterns
 - **Pomodoro timer** — full work/break session planner (configurable lengths, session count, long-break cadence), two visual styles (tomato/milk), a floating on-board overlay with its own quick controls, and a header hover popover for pause/skip/reset without opening the panel
 - **Search** — filter cards by title, description, and checklist content across the whole board
+
+## Screenshots
+
+| Card detail | Pomodoro timer | Lavender theme |
+| --- | --- | --- |
+| ![Card detail view with rich-text description and checklist](docs/screenshots/card-detail.png) | ![Pomodoro timer panel](docs/screenshots/pomodoro.png) | ![Board in the Lavender theme](docs/screenshots/lavender-theme.png) |
 
 ## Tech stack
 
