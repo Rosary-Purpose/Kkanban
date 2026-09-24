@@ -4395,8 +4395,13 @@ document.getElementById("wb-clear-page-btn").addEventListener("click", () => {
 // ----- Whiteboard: pen color/width toolbar -----
 
 const wbPenColorDot = document.getElementById("wb-pen-color-dot");
+// The whole palette takes the pen color; its outline stays the toolbar's
+// text color (so black/white still have a visible edge in any theme), and
+// the paint wells use whichever of dark/white contrasts with the fill.
 function updateWbPenColorDot() {
   wbPenColorDot.setAttribute("fill", wbPenColor);
+  const wellColor = contrastTextColor(wbPenColor);
+  document.querySelectorAll(".wb-pen-color-well").forEach((w) => w.setAttribute("fill", wellColor));
 }
 updateWbPenColorDot();
 document.getElementById("wb-pen-color-btn").addEventListener("click", (e) => {
