@@ -1879,7 +1879,11 @@ let wbTextEditActive = false;
 
 function updateWbToolbarGroups() {
   document.getElementById("wb-text-format-group").classList.toggle("hidden", !(wbTool === "text" || wbTextEditActive));
-  document.getElementById("wb-pen-options-group").classList.toggle("hidden", !(wbTool === "pen" && !wbTextEditActive));
+  // Pen options stay open when switching pen -> eraser (hiding them there
+  // was jarring), but picking the eraser from any other tool doesn't open them.
+  const penGroup = document.getElementById("wb-pen-options-group");
+  const keepForEraser = wbTool === "eraser" && !penGroup.classList.contains("hidden");
+  penGroup.classList.toggle("hidden", !((wbTool === "pen" || keepForEraser) && !wbTextEditActive));
 }
 
 function setWbTool(tool) {
@@ -2309,10 +2313,16 @@ function resolveWbAttachments(wb) {
 // into/out of the current (possibly multi-shape) selection; a plain click
 // either starts a group drag (if this shape is already part of a multi
 // selection) or replaces the selection with just this shape first.
+// Middle-click, or left-click while holding Space, is a pan - shapes and
+// handles let it through to the canvas instead of grabbing/moving themselves.
+function wbIsPanPress(e) {
+  return e.button === 1 || (e.button === 0 && wbSpaceDown);
+}
 function wbWireShapeMousedown(el, shape) {
   el.dataset.shapeId = shape.id;
   el.style.cursor = "move";
   el.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || wbSpaceDown) return; // pan (or right-click menu) - not a grab
     // A connector's wide invisible hit area overlaps the shapes it's
     // attached to (and a branch's fill covers the space between its ends),
     // so a press that lands inside a shape goes to that shape - otherwise
@@ -3038,6 +3048,7 @@ function renderWhiteboardSelection() {
       dot.classList.add("wb-selection-el");
       dot.style.cursor = "pointer";
       dot.addEventListener("mousedown", (e) => {
+        if (wbIsPanPress(e)) return; // let the canvas pan instead
         e.stopPropagation();
         const field = handleName === "top" ? "topAttach" : handleName === "left" ? "leftAttach" : "rightAttach";
         shape[field] = null;
@@ -3060,6 +3071,7 @@ function renderWhiteboardSelection() {
     forkHandle.classList.add("wb-selection-el");
     forkHandle.style.cursor = "ns-resize";
     forkHandle.addEventListener("mousedown", (e) => {
+      if (wbIsPanPress(e)) return; // let the canvas pan instead
       e.stopPropagation();
       wbResizeState = { id: shape.id, handle: "branch-fork" };
     });
@@ -3080,6 +3092,7 @@ function renderWhiteboardSelection() {
       dot.classList.add("wb-selection-el");
       dot.style.cursor = "pointer";
       dot.addEventListener("mousedown", (e) => {
+        if (wbIsPanPress(e)) return; // let the canvas pan instead
         e.stopPropagation();
         const field = handleName === "start" ? "startAttach" : "endAttach";
         shape[field] = null; // detach while actively dragging; wbAttachEndpoint re-attaches on release if it lands on something
@@ -3110,6 +3123,7 @@ function renderWhiteboardSelection() {
         dot.classList.add("wb-selection-el");
         dot.style.cursor = "ns-resize";
         dot.addEventListener("mousedown", (e) => {
+          if (wbIsPanPress(e)) return; // let the canvas pan instead
           e.stopPropagation();
           wbResizeState = { id: shape.id, handle: "width" };
         });
@@ -3151,6 +3165,7 @@ function renderWhiteboardSelection() {
     handle.classList.add("wb-selection-el");
     handle.style.cursor = corner + "-resize";
     handle.addEventListener("mousedown", (e) => {
+      if (wbIsPanPress(e)) return; // let the canvas pan instead
       e.stopPropagation();
       const startWorld = wbClientToWorld(e.clientX, e.clientY);
       wbResizeState = { id: shape.id, handle: corner, origX: shape.x, origY: shape.y, origW: shape.width, origH: shape.height, startX: startWorld.x, startY: startWorld.y };
