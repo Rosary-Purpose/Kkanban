@@ -1584,12 +1584,18 @@ function switchBoard(id) {
   renderSidebar();
   render();
   syncBoardBackground();
-  if (whiteboardActive) {
-    updateWbPagePicker();
-    renderWhiteboardCanvas();
-    wbGetHistory(getActiveWhiteboard().id); // same reasoning as toggleWhiteboardView/switchWhiteboardPage
-  }
+  wbRefreshForBoardChange();
   saveBoard();
+}
+// After `board` changes while the whiteboard is showing (switch, or the
+// open board being deleted/archived) - otherwise the old board's canvas
+// stays on screen and its shapes stay clickable.
+function wbRefreshForBoardChange() {
+  if (!whiteboardActive) return;
+  updateWbPagePicker();
+  renderWhiteboardCanvas();
+  wbGetHistory(getActiveWhiteboard().id); // same reasoning as toggleWhiteboardView/switchWhiteboardPage
+  wbPreloadBoardPhotos();
 }
 
 // ----- Whiteboard -----
@@ -1614,6 +1620,7 @@ function toggleWhiteboardView() {
   if (whiteboardActive) {
     updateWbPagePicker();
     renderWhiteboardCanvas();
+    wbPreloadBoardPhotos();
     // Seeds this page's undo baseline from its current (pre-edit) state -
     // must happen before anything is drawn, not lazily on the first push,
     // or that first push's "before" snapshot ends up capturing the shape
@@ -1941,15 +1948,20 @@ const WB_QUICK_ADD_TOOLS = new Set(["rect", "ellipse", "diamond", "blockArrow", 
 // on top of each other at the view's center every time. Wraps back to
 // center after a handful of steps instead of drifting off-screen forever.
 let wbQuickAddCounts = {};
-function wbQuickAddShape(type) {
+// atPoint: a plain click (no drag) with a shape tool drops the default-size
+// shape centered right there instead of at the view's center.
+function wbQuickAddShape(type, atPoint) {
   const wb = getActiveWhiteboard();
   if (!wb) return;
-  const rect = whiteboardSvg.getBoundingClientRect();
-  const viewCenter = wbClientToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
-  const step = (wbQuickAddCounts[type] || 0) % 6;
-  wbQuickAddCounts[type] = step + 1;
-  const offset = WB_PASTE_OFFSET * step;
-  const center = { x: viewCenter.x + offset, y: viewCenter.y + offset };
+  let center = atPoint;
+  if (!center) {
+    const rect = whiteboardSvg.getBoundingClientRect();
+    const viewCenter = wbClientToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const step = (wbQuickAddCounts[type] || 0) % 6;
+    wbQuickAddCounts[type] = step + 1;
+    const offset = WB_PASTE_OFFSET * step;
+    center = { x: viewCenter.x + offset, y: viewCenter.y + offset };
+  }
   let shape;
   if (type === "branch") {
     const half = 45, drop = 55;
@@ -1969,6 +1981,8 @@ function wbQuickAddShape(type) {
   if (WB_FILLABLE_TOOLS.has(type)) shape.noFill = wbNoFillTools.has(type);
   wb.shapes.push(shape);
   wbSelectedShapeIds = new Set([shape.id]);
+  // Same revert-to-Select rule as drawing one by dragging (commitDrawShape).
+  if (atPoint && !wbLockedTools.has(type)) setWbTool("select");
   renderWhiteboardCanvas();
   wbPushHistory();
   saveBoard();
@@ -2024,7 +2038,7 @@ function wbClearSelection() {
 // same untransformed "world" space the pan/zoom <g> wraps - this undoes
 // that transform so drawing/dragging math never has to think about the
 // current pan or zoom level.
-function wbClientToWorld(clientX, clientY) {
+function wbClientToWorld(clientX, clientY, noGridSnap = false) {
   const wb = getActiveWhiteboard();
   const rect = whiteboardSvg.getBoundingClientRect();
   let x = (clientX - rect.left - wb.viewport.x) / wb.viewport.zoom;
@@ -2033,7 +2047,7 @@ function wbClientToWorld(clientX, clientY) {
   // means every one of them gets it for free, and a shape-to-shape snap
   // (wbAttachEndpoint) still wins afterward since it overwrites whatever
   // coordinate this produced.
-  if (wbSnapToGrid) {
+  if (wbSnapToGrid && !noGridSnap) {
     x = Math.round(x / WB_GRID_SIZE) * WB_GRID_SIZE;
     y = Math.round(y / WB_GRID_SIZE) * WB_GRID_SIZE;
   }
@@ -2088,13 +2102,28 @@ const WB_SNAP_TARGET_TYPES = new Set(["rect", "ellipse", "diamond", "blockArrow"
 const WB_SNAP_PADDING = 10;
 
 function wbShapeCenter(shape) {
-  if (shape.type === "blockArrow") return { x: (shape.x1 + shape.x2) / 2, y: (shape.y1 + shape.y2) / 2 };
+  if (shape.type === "blockArrow") {
+    // Center of its real outline box (see wbShapeBox), so boundary points
+    // computed from center + half-size line up with that box.
+    const box = wbShapeBox(shape);
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  }
   return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
 }
 function wbShapeBox(shape) {
   if (shape.type === "pen") {
     const xs = shape.points.map((p) => p.x);
     const ys = shape.points.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+  // A block arrow's real outline (shaft + head), not just its two end
+  // points - a flat horizontal arrow would otherwise have zero height,
+  // clipping its text label and flattening its snap/selection box.
+  if (shape.type === "blockArrow") {
+    const pts = blockArrowPoints(shape.x1, shape.y1, shape.x2, shape.y2, shape.thickness);
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
@@ -2164,8 +2193,69 @@ function wbAttachEndpoint(shape, end, wb, worldX, worldY) {
     if (end === "start") { shape.x1 = worldX; shape.y1 = worldY; } else { shape.x2 = worldX; shape.y2 = worldY; }
     return;
   }
-  const center = wbShapeCenter(target);
-  shape[field] = { shapeId: target.id, dx: worldX - center.x || 0.001, dy: worldY - center.y || 0.001 };
+  const other = end === "start" ? { x: shape.x2, y: shape.y2 } : { x: shape.x1, y: shape.y1 };
+  const pin = wbChoosePin(target, worldX, worldY, other.x, other.y);
+  shape[field] = { shapeId: target.id, dx: pin.dx, dy: pin.dy };
+}
+
+// ----- Whiteboard: connection pins -----
+// Every snap target has 4 pins, at the middle of its top/right/bottom/left
+// sides. Stored in the same {dx, dy} direction form as before, so arrows
+// still re-route when the shape moves or resizes.
+const WB_PIN_DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const WB_PIN_SNAP_PX = 18;
+function wbPinPoints(target) {
+  return WB_PIN_DIRS.map(([dx, dy]) => ({ dx, dy, ...wbBoundaryPoint(target, dx, dy) }));
+}
+// Dropped close to a pin: that pin. Anywhere else on the shape (e.g. its
+// middle): the pin on the side facing the connector's other end.
+function wbChoosePin(target, x, y, otherX, otherY) {
+  const pins = wbPinPoints(target);
+  let best = pins[0], bestD = Infinity;
+  pins.forEach((p) => { const d = Math.hypot(p.x - x, p.y - y); if (d < bestD) { bestD = d; best = p; } });
+  if (bestD <= WB_PIN_SNAP_PX / getActiveWhiteboard().viewport.zoom) return best;
+  const box = wbShapeBox(target);
+  const c = wbShapeCenter(target);
+  const vx = (otherX - c.x) / (box.width || 1), vy = (otherY - c.y) / (box.height || 1);
+  if (Math.abs(vx) > Math.abs(vy)) return pins[vx > 0 ? 1 : 3];
+  return pins[vy > 0 ? 2 : 0];
+}
+// Pin dots on whatever shape a connector end is being dragged over, with
+// the one it'll attach to highlighted. Only exists mid-drag.
+let wbPinPreview = null;
+function wbBranchHandlePoint(shape, handle) {
+  if (handle === "branch-top") return { x: shape.x1, y: shape.y1 };
+  if (handle === "branch-left") return { x: shape.x2, y: shape.y2 };
+  return { x: shape.x3, y: shape.y3 };
+}
+function wbUpdatePinPreview(wb, x, y, otherX, otherY) {
+  const target = wbFindSnapTarget(wb, x, y);
+  wbPinPreview = target ? { target, pin: wbChoosePin(target, x, y, otherX, otherY) } : null;
+}
+function wbClearPinPreview() {
+  wbPinPreview = null;
+  const old = document.getElementById("wb-pin-preview");
+  if (old) old.remove();
+}
+function renderWbPinPreview(g) {
+  const old = document.getElementById("wb-pin-preview");
+  if (old) old.remove();
+  if (!wbPinPreview) return;
+  const layer = document.createElementNS(WB_SVG_NS, "g");
+  layer.id = "wb-pin-preview";
+  layer.setAttribute("pointer-events", "none");
+  wbPinPoints(wbPinPreview.target).forEach((p) => {
+    const active = p.dx === wbPinPreview.pin.dx && p.dy === wbPinPreview.pin.dy;
+    const dot = document.createElementNS(WB_SVG_NS, "circle");
+    dot.setAttribute("cx", p.x);
+    dot.setAttribute("cy", p.y);
+    dot.setAttribute("r", active ? 6 : 4);
+    dot.setAttribute("fill", active ? WB_SELECT_COLOR : "#ffffff");
+    dot.setAttribute("stroke", WB_SELECT_COLOR);
+    dot.setAttribute("stroke-width", 1.5);
+    layer.appendChild(dot);
+  });
+  g.appendChild(layer);
 }
 // A branch shape has three independently-snappable endpoints (top/left/
 // right) instead of a line's two - kept as its own function rather than
@@ -2181,8 +2271,9 @@ function wbAttachBranchEndpoint(shape, which, wb, worldX, worldY) {
     shape[coordX] = worldX; shape[coordY] = worldY;
     return;
   }
-  const center = wbShapeCenter(target);
-  shape[field] = { shapeId: target.id, dx: worldX - center.x || 0.001, dy: worldY - center.y || 0.001 };
+  const fork = wbBranchForkPoint(shape);
+  const pin = wbChoosePin(target, worldX, worldY, fork.x, fork.y);
+  shape[field] = { shapeId: target.id, dx: pin.dx, dy: pin.dy };
 }
 // Runs before every render - re-derives attached endpoints from their
 // target shape's *current* position/size, which is what makes an arrow
@@ -2221,6 +2312,29 @@ function wbWireShapeMousedown(el, shape) {
   el.dataset.shapeId = shape.id;
   el.style.cursor = "move";
   el.addEventListener("mousedown", (e) => {
+    // A connector's wide invisible hit area overlaps the shapes it's
+    // attached to (and a branch's fill covers the space between its ends),
+    // so a press that lands inside a shape goes to that shape - otherwise
+    // grabbing a shape near its arrow grabbed (and detached) the arrow.
+    let target = shape;
+    if (WB_CONNECTOR_TYPES.has(shape.type)) {
+      const p = wbClientToWorld(e.clientX, e.clientY, true);
+      target = wbShapeContainingPoint(getActiveWhiteboard(), p.x, p.y) || shape;
+    }
+    // Double-click to edit text, detected on the second press (e.detail)
+    // rather than a dblclick listener: the first press selects the shape,
+    // which re-renders the canvas and replaces this element, so a dblclick
+    // event never reaches it. Works with any tool, same as before.
+    if (e.detail === 2 && !el.isContentEditable) {
+      const div = document.querySelector(`.wb-text-editor[data-shape-id="${target.id}"]`);
+      if (div) {
+        e.preventDefault();
+        e.stopPropagation();
+        wbDragState = null;
+        wbEnterTextEdit(target, div, e.clientX, e.clientY);
+        return;
+      }
+    }
     // A drawing tool being active takes priority - let the mousedown bubble
     // up to the canvas-level draw-start handler instead of selecting/
     // dragging whatever shape happens to be under the click. Text is the
@@ -2238,26 +2352,81 @@ function wbWireShapeMousedown(el, shape) {
     // text cursor normally instead of hijacking it to start a drag.
     if (el.isContentEditable) return;
     e.stopPropagation();
-    if (e.shiftKey) {
-      wbToggleSelect(shape.id);
+    // Shift+press adds an unselected shape to the selection right away. On
+    // an already-selected one it starts a drag (Shift then locks the move
+    // straight) - it's only toggled back off if the mouse never moved.
+    if (e.shiftKey && !wbSelectedShapeIds.has(target.id)) {
+      wbToggleSelect(target.id);
       return;
     }
-    if (!wbSelectedShapeIds.has(shape.id)) wbSelectOnly(shape.id);
+    if (!wbSelectedShapeIds.has(target.id)) wbSelectOnly(target.id);
     const wb = getActiveWhiteboard();
     const startWorld = wbClientToWorld(e.clientX, e.clientY);
     const origins = {};
     wbSelectedShapeIds.forEach((id) => {
       const s = wb.shapes.find((x) => x.id === id);
-      if (!s) return;
-      origins[id] = { ...s };
-      // Grabbing the body (not an endpoint) of an attached arrow detaches
-      // it - otherwise resolveWbAttachments would snap it straight back to
-      // its old spot on every render during the drag, and it would never
-      // visibly move.
-      if (s.startAttach || s.endAttach) { s.startAttach = null; s.endAttach = null; }
-      if (s.topAttach || s.leftAttach || s.rightAttach) { s.topAttach = null; s.leftAttach = null; s.rightAttach = null; }
+      if (s) origins[id] = { ...s };
     });
-    wbDragState = { ids: [...wbSelectedShapeIds], origins, startX: startWorld.x, startY: startWorld.y };
+    wbDragState = {
+      ids: [...wbSelectedShapeIds], origins, startX: startWorld.x, startY: startWorld.y,
+      startClientX: e.clientX, startClientY: e.clientY, moved: false,
+      toggleOffId: e.shiftKey ? target.id : null,
+    };
+  });
+}
+
+const WB_CONNECTOR_TYPES = new Set(["line", "plainLine", "branch"]);
+const WB_STRAIGHTEN_SNAP_PX = 8;
+// For a drag of (rdx, rdy): the adjusted dx and/or dy (null = no snap) that
+// would make an attached line/arrow exactly horizontal or vertical, if one
+// is within a few screen px of it. Only connectors with one end on a moving
+// shape and the other end staying put count.
+function wbConnectorStraightenSnap(wb, state, rdx, rdy) {
+  const moving = new Set(state.ids);
+  const threshold = WB_STRAIGHTEN_SNAP_PX / wb.viewport.zoom;
+  let best = { x: null, xd: Infinity, xFrom: null, y: null, yd: Infinity, yFrom: null };
+  wb.shapes.forEach((c) => {
+    if (!WB_SNAP_SOURCE_TYPES.has(c.type) || moving.has(c.id)) return;
+    const ends = [[c.startAttach, c.x2, c.y2, c.endAttach], [c.endAttach, c.x1, c.y1, c.startAttach]];
+    for (const [a, fixedX, fixedY, otherA] of ends) {
+      if (!a || !moving.has(a.shapeId)) continue;
+      if (otherA && moving.has(otherA.shapeId)) continue; // both ends move together
+      const orig = state.origins[a.shapeId];
+      if (!orig) continue;
+      const p = wbBoundaryPoint(orig, a.dx, a.dy);
+      const offY = fixedY - (p.y + rdy);
+      const offX = fixedX - (p.x + rdx);
+      if (Math.abs(offY) <= threshold && Math.abs(offY) < best.yd) best = { ...best, y: rdy + offY, yd: Math.abs(offY), yFrom: c.id };
+      if (Math.abs(offX) <= threshold && Math.abs(offX) < best.xd) best = { ...best, x: rdx + offX, xd: Math.abs(offX), xFrom: c.id };
+    }
+  });
+  // Both from the same connector would squash it to a point - keep the closer one.
+  if (best.x !== null && best.y !== null && best.xFrom === best.yFrom) {
+    if (best.xd <= best.yd) best.y = null; else best.x = null;
+  }
+  return { x: best.x, y: best.y };
+}
+const WB_ATTACH_FIELDS = ["startAttach", "endAttach", "topAttach", "leftAttach", "rightAttach"];
+// Topmost snap-target shape whose box contains the point (no padding).
+function wbShapeContainingPoint(wb, x, y) {
+  for (let i = wb.shapes.length - 1; i >= 0; i--) {
+    const s = wb.shapes[i];
+    if (!WB_SNAP_TARGET_TYPES.has(s.type)) continue;
+    const box = wbShapeBox(s);
+    if (x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height) return s;
+  }
+  return null;
+}
+// Runs on a drag's first real movement (not on press - a plain click to
+// select a connector used to detach it). An end only detaches if the shape
+// it's attached to isn't being moved along with it; otherwise
+// resolveWbAttachments would snap it straight back every frame.
+function wbDetachForDrag(wb, ids) {
+  const moving = new Set(ids);
+  ids.forEach((id) => {
+    const s = wb.shapes.find((x) => x.id === id);
+    if (!s) return;
+    WB_ATTACH_FIELDS.forEach((f) => { if (s[f] && !moving.has(s[f].shapeId)) s[f] = null; });
   });
 }
 
@@ -2300,7 +2469,7 @@ function wbWireShapeContextMenu(el, shape, colorable) {
       const wb = getActiveWhiteboard();
       wb.shapes = wb.shapes.filter((s) => s.id !== shape.id);
       wbSelectedShapeIds.delete(shape.id);
-      wbDeletePhotoFilesForShapes([shape]);
+      wbDeferPhotoFileDeletes([shape]);
       renderWhiteboardCanvas();
       wbPushHistory();
       saveBoard();
@@ -2491,7 +2660,8 @@ function createShapeElement(shape) {
     img.setAttribute("preserveAspectRatio", "none");
     group.appendChild(img);
     if (shape.id !== "__preview__") {
-      wbGetPhotoDataUrl(shape).then((url) => {
+      // Cached: applied right away (no async gap per re-render/drag frame).
+      const applyPhoto = (url) => {
         if (!url) {
           // Its file is missing - a blank box would just look like nothing
           // was ever there, so this shows it's a real, recoverable problem
@@ -2522,9 +2692,10 @@ function createShapeElement(shape) {
           return;
         }
         wbBrokenPhotoIds.delete(shape.id);
-        img.setAttributeNS("http://www.w3.org/1999/xlink", "href", url);
         img.setAttribute("href", url);
-      });
+      };
+      if (wbPhotoCache.has(shape.id)) applyPhoto(wbPhotoCache.get(shape.id));
+      else wbGetPhotoDataUrl(shape).then(applyPhoto);
       wbWireShapeMousedown(img, shape);
       wbWireShapeContextMenu(img, shape, false);
       // Right-click is easy to miss - double-click (already the convention
@@ -2631,7 +2802,7 @@ function createShapeElement(shape) {
       // Works regardless of the active tool - labeling an existing shape
       // isn't "drawing," so it shouldn't require switching to Select first.
       e.stopPropagation();
-      wbEnterTextEdit(shape, fo.querySelector(".wb-text-editor"));
+      wbEnterTextEdit(shape, fo.querySelector(".wb-text-editor"), e.clientX, e.clientY);
     });
   }
   return group;
@@ -2696,7 +2867,7 @@ function wbCreateTextOverlay(shape, align, standalone) {
       // Same reasoning as the fillable-shape label case - editing existing
       // text isn't "drawing," so no tool-switch should be required for it.
       e.stopPropagation();
-      wbEnterTextEdit(shape, div);
+      wbEnterTextEdit(shape, div, e.clientX, e.clientY);
     });
     // Auto-grows the box to fit whatever's typed instead of silently
     // clipping it - a standalone text box's whole purpose is to hold its
@@ -2722,7 +2893,10 @@ function wbCreateTextOverlay(shape, align, standalone) {
 // so a plain click just selects/drags the shape like any other - only a
 // double-click (or, for the Text tool, placing a brand new box) actually
 // opens it up for typing.
-function wbEnterTextEdit(shape, div) {
+function wbEnterTextEdit(shape, div, clientX, clientY) {
+  // Already editing: a double-click is just the browser's normal select-
+  // one-word, not a request to start over with everything selected.
+  if (div.isContentEditable) return;
   div.parentElement.style.pointerEvents = "auto";
   div.parentElement.classList.add("wb-text-editor-editing");
   div.style.pointerEvents = "auto";
@@ -2734,7 +2908,11 @@ function wbEnterTextEdit(shape, div) {
   // without affecting textContent (so the empty-check on commit still works).
   if (!div.textContent) div.innerHTML = "<br>";
   div.focus();
-  document.execCommand("selectAll", false, null);
+  // Double-clicked on a word: select just that word. Anywhere else (empty
+  // space, a brand new box): select everything, as before.
+  if (clientX === undefined || !wbSelectWordAt(div, clientX, clientY)) {
+    document.execCommand("selectAll", false, null);
+  }
   // The size stepper is a simple step counter, not a read of this
   // particular label's actual formatting - reset it each time a different
   // piece of text starts being edited, same tradeoff the card description's
@@ -2746,6 +2924,23 @@ function wbEnterTextEdit(shape, div) {
   // see updateWbToolbarGroups.
   wbTextEditActive = true;
   updateWbToolbarGroups();
+}
+function wbSelectWordAt(div, clientX, clientY) {
+  const r = document.caretRangeFromPoint && document.caretRangeFromPoint(clientX, clientY);
+  if (!r || r.startContainer.nodeType !== Node.TEXT_NODE || !div.contains(r.startContainer)) return false;
+  const text = r.startContainer.textContent;
+  const isWordChar = (ch) => /[\p{L}\p{N}_'’-]/u.test(ch);
+  let start = r.startOffset, end = r.startOffset;
+  while (start > 0 && isWordChar(text[start - 1])) start--;
+  while (end < text.length && isWordChar(text[end])) end++;
+  if (start === end) return false;
+  const word = document.createRange();
+  word.setStart(r.startContainer, start);
+  word.setEnd(r.startContainer, end);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(word);
+  return true;
 }
 function wbCommitTextEdit(shape, div, standalone) {
   const plainText = div.textContent.replace(/\r\n?/g, "\n").trim();
@@ -3028,6 +3223,7 @@ function renderWhiteboardPageGrid(g, wb) {
     line.setAttribute("class", "wb-page-grid-line");
     g.appendChild(line);
   }
+  return grid;
 }
 
 const WB_PAGE_TOP_MARGIN = 50;
@@ -3085,9 +3281,8 @@ function wbMoveShapeLayer(shape, direction) {
 // vertical center line, not merely near it. Drawn after every shape so it
 // stays visible on top instead of being covered by whatever's being
 // dragged over it.
-function renderWbCenterSnapGuide(g, wb) {
+function renderWbCenterSnapGuide(g, grid) {
   if (!wbCenterSnapActive) return;
-  const grid = wbComputePageGrid(wb);
   const x = WB_PAGE_WIDTH / 2;
   const line = document.createElementNS(WB_SVG_NS, "line");
   line.setAttribute("x1", x);
@@ -3106,13 +3301,24 @@ function renderWhiteboardCanvas() {
   const wb = getActiveWhiteboard();
   wbEnsurePageViewportCentered(wb);
   resolveWbAttachments(wb);
-  renderWhiteboardPageGrid(g, wb);
+  const grid = renderWhiteboardPageGrid(g, wb);
   wbShapesInPaintOrder(wb).forEach((shape) => g.appendChild(createShapeElement(shape)));
-  renderWbCenterSnapGuide(g, wb);
+  renderWbCenterSnapGuide(g, grid);
+  renderWbPinPreview(g);
   applyWhiteboardTransform();
   renderWhiteboardSelection();
 }
 
+// Shift's straight-angle lock: (x, y) moved onto the nearest 45-degree
+// direction from (fromX, fromY), keeping its distance.
+function wbAngleSnap(fromX, fromY, x, y) {
+  const dx = x - fromX, dy = y - fromY;
+  const dist = Math.hypot(dx, dy);
+  if (!dist) return { x, y };
+  const step = Math.PI / 4;
+  const angle = Math.round(Math.atan2(dy, dx) / step) * step;
+  return { x: fromX + Math.cos(angle) * dist, y: fromY + Math.sin(angle) * dist };
+}
 function startDrawShape(e) {
   const start = wbClientToWorld(e.clientX, e.clientY);
   // `current` is populated right away (not left null until the first
@@ -3135,17 +3341,7 @@ function updateDrawShape(e) {
     // increments (straight horizontal/vertical/diagonal) at the current
     // drag distance.
     let endX = cur.x, endY = cur.y;
-    if (e.shiftKey) {
-      const dx = cur.x - wbDrawState.startX;
-      const dy = cur.y - wbDrawState.startY;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 0) {
-        const step = Math.PI / 4;
-        const angle = Math.round(Math.atan2(dy, dx) / step) * step;
-        endX = wbDrawState.startX + Math.cos(angle) * dist;
-        endY = wbDrawState.startY + Math.sin(angle) * dist;
-      }
-    }
+    if (e.shiftKey) ({ x: endX, y: endY } = wbAngleSnap(wbDrawState.startX, wbDrawState.startY, cur.x, cur.y));
     const current = { x1: wbDrawState.startX, y1: wbDrawState.startY, x2: endX, y2: endY };
     previewShape = { id: "__preview__", type: wbDrawState.type, ...current };
     wbDrawState.current = current;
@@ -3179,6 +3375,11 @@ function updateDrawShape(e) {
   el.setAttribute("stroke-dasharray", "4 3");
   ensureWhiteboardRootG().appendChild(el);
   wbDrawState.el = el;
+  if (WB_SNAP_SOURCE_TYPES.has(wbDrawState.type)) {
+    const c = wbDrawState.current;
+    wbUpdatePinPreview(getActiveWhiteboard(), c.x2, c.y2, c.x1, c.y1);
+    renderWbPinPreview(ensureWhiteboardRootG());
+  }
 }
 function commitDrawShape() {
   const state = wbDrawState;
@@ -3199,7 +3400,7 @@ function commitDrawShape() {
     // instead of a sideways stem with an always-horizontal fork.
     const dragDx = cur.x2 - cur.x1, dragDy = cur.y2 - cur.y1;
     const dragLen = Math.hypot(dragDx, dragDy);
-    if (dragLen < 4) return;
+    if (dragLen < 4) { wbQuickAddShape("branch", { x: cur.x1, y: cur.y1 }); return; }
     const spread = 55;
     const perpX = -dragDy / dragLen, perpY = dragDx / dragLen;
     shape = {
@@ -3214,8 +3415,8 @@ function commitDrawShape() {
     wbAttachBranchEndpoint(shape, "left", wb, shape.x2, shape.y2);
     wbAttachBranchEndpoint(shape, "right", wb, shape.x3, shape.y3);
   } else if (WB_VECTOR_TOOLS.has(state.type)) {
-    // A click with no real drag reads as a misfire, not an intentional arrow.
-    if (Math.hypot(cur.x2 - cur.x1, cur.y2 - cur.y1) < 4) return;
+    // A click with no real drag drops a default-length one at the click.
+    if (Math.hypot(cur.x2 - cur.x1, cur.y2 - cur.y1) < 4) { wbQuickAddShape(state.type, { x: cur.x1, y: cur.y1 }); return; }
     shape = { id: crypto.randomUUID(), type: state.type, x1: cur.x1, y1: cur.y1, x2: cur.x2, y2: cur.y2, startAttach: null, endAttach: null };
     if (state.type === "blockArrow") {
       // Same proportional formula the old fixed calc used, just captured as
@@ -3236,6 +3437,9 @@ function commitDrawShape() {
     else if (width < 4 || height < 4) { return; }
     shape = { id: crypto.randomUUID(), type: "text", x, y, width, height, text: "" };
   } else {
+    // A plain click drops a default-size shape centered on the click; a
+    // drag that's only thin in one direction is still treated as a misfire.
+    if (cur.width < 4 && cur.height < 4) { wbQuickAddShape(state.type, { x: cur.x, y: cur.y }); return; }
     if (cur.width < 4 || cur.height < 4) return;
     shape = { id: crypto.randomUUID(), type: state.type, x: cur.x, y: cur.y, width: cur.width, height: cur.height };
   }
@@ -3260,7 +3464,7 @@ function commitDrawShape() {
 
 function wbStartPenStroke(e) {
   const p = wbClientToWorld(e.clientX, e.clientY);
-  wbPenDrawState = { points: [p], el: null };
+  wbPenDrawState = { points: [p], el: null, d: `M ${p.x} ${p.y}` };
 }
 function wbUpdatePenStroke(e) {
   const p = wbClientToWorld(e.clientX, e.clientY);
@@ -3276,10 +3480,22 @@ function wbUpdatePenStroke(e) {
   const minDist = 2 / getActiveWhiteboard().viewport.zoom;
   if (last && Math.hypot(p.x - last.x, p.y - last.y) < minDist) return;
   pts.push(p);
-  if (wbPenDrawState.el) wbPenDrawState.el.remove();
-  const el = createShapeElement({ id: "__preview__", type: "pen", points: pts, color: wbPenColor, width: WB_PEN_WIDTHS[wbPenWidthIndex] });
-  ensureWhiteboardRootG().appendChild(el);
-  wbPenDrawState.el = el;
+  // The preview path is extended by one segment per move (same curve
+  // wbPenPathD builds) instead of being rebuilt from every point so far -
+  // that got slower the longer the stroke went on.
+  const n = pts.length;
+  if (n >= 3) {
+    const a = pts[n - 2];
+    wbPenDrawState.d += ` Q ${a.x} ${a.y} ${(a.x + p.x) / 2} ${(a.y + p.y) / 2}`;
+  }
+  const d = `${wbPenDrawState.d} L ${p.x} ${p.y}`;
+  if (!wbPenDrawState.el) {
+    const el = createShapeElement({ id: "__preview__", type: "pen", points: pts, color: wbPenColor, width: WB_PEN_WIDTHS[wbPenWidthIndex] });
+    ensureWhiteboardRootG().appendChild(el);
+    wbPenDrawState.el = el;
+  }
+  const el = wbPenDrawState.el;
+  (el.tagName === "path" ? [el] : el.querySelectorAll("path")).forEach((path) => path.setAttribute("d", d));
 }
 function wbCommitPenStroke() {
   const state = wbPenDrawState;
@@ -3309,8 +3525,10 @@ function wbCommitPenStroke() {
 // just parse(stringify(...)) - simplest possible correct snapshot.
 const WB_HISTORY_LIMIT = 50;
 let wbHistoryByPage = {};
+// Snapshots are kept as JSON strings - one stringify per action (no extra
+// parse), lighter to hold, and cheap to compare for "nothing changed".
 function wbSnapshotShapes(wb) {
-  return JSON.parse(JSON.stringify(wb.shapes));
+  return JSON.stringify(wb.shapes);
 }
 function wbGetHistory(pageId) {
   if (!wbHistoryByPage[pageId]) {
@@ -3326,10 +3544,21 @@ function wbPushHistory() {
   const wb = getActiveWhiteboard();
   if (!wb) return;
   const h = wbGetHistory(wb.id);
+  const snap = wbSnapshotShapes(wb);
+  // Nothing actually changed (a click, a label edit closed as-is) - don’t
+  // add a do-nothing undo step or throw away the redo entries.
+  if (snap === h.stack[h.index]) return;
   h.stack = h.stack.slice(0, h.index + 1); // drop any redo entries past the current point
-  h.stack.push(wbSnapshotShapes(wb));
+  h.stack.push(snap);
   if (h.stack.length > WB_HISTORY_LIMIT) h.stack.shift();
   h.index = h.stack.length - 1;
+}
+// A page changed outside the normal undo flow (fixing a missing photo):
+// its old snapshots still hold the broken version, so start its history
+// over from the current state instead of letting Undo bring that back.
+function wbResetPageHistory(w) {
+  delete wbHistoryByPage[w.id];
+  if (board.whiteboards && board.whiteboards.includes(w)) wbGetHistory(w.id);
 }
 function wbUndo() {
   const wb = getActiveWhiteboard();
@@ -3337,7 +3566,7 @@ function wbUndo() {
   const h = wbGetHistory(wb.id);
   if (h.index <= 0) return;
   h.index -= 1;
-  wb.shapes = JSON.parse(JSON.stringify(h.stack[h.index]));
+  wb.shapes = JSON.parse(h.stack[h.index]);
   wbClearSelection();
   renderWhiteboardCanvas();
   saveBoard();
@@ -3348,7 +3577,7 @@ function wbRedo() {
   const h = wbGetHistory(wb.id);
   if (h.index >= h.stack.length - 1) return;
   h.index += 1;
-  wb.shapes = JSON.parse(JSON.stringify(h.stack[h.index]));
+  wb.shapes = JSON.parse(h.stack[h.index]);
   wbClearSelection();
   renderWhiteboardCanvas();
   saveBoard();
@@ -3381,6 +3610,7 @@ async function wbPasteClipboard() {
   wbPasteCount += 1;
   const offset = WB_PASTE_OFFSET * wbPasteCount;
   const newShapes = [];
+  let skippedPhotos = 0;
   for (const orig of wbClipboard) {
     const copy = JSON.parse(JSON.stringify(orig));
     const oldId = copy.id;
@@ -3415,20 +3645,25 @@ async function wbPasteClipboard() {
         await invoke("save_wb_photo", { photoId: copy.id, dataBase64: base64 });
         appData.wbPhotoRegistry[copy.id] = { originalName: copy.originalName, boardName: board.name, pageName: wb.name };
       } catch (err) {
+        skippedPhotos += 1;
         continue; // source file unreadable - skip this one rather than paste a guaranteed-broken copy
       }
     }
     newShapes.push(copy);
   }
+  if (skippedPhotos) openAlertPopover(`${skippedPhotos === 1 ? "A copied image" : skippedPhotos + " copied images"} couldn’t be pasted - the original file is no longer available.`);
   if (!newShapes.length) return;
-  newShapes.forEach((s) => wb.shapes.push(s));
+  // Copying a large photo can take a moment - if the page was switched in
+  // the meantime, land on the page now showing (which is also the one the
+  // render and undo step below apply to), not the one paste started on.
+  getActiveWhiteboard().shapes.push(...newShapes);
   wbSelectedShapeIds = new Set(newShapes.map((s) => s.id));
   renderWhiteboardCanvas();
   wbPushHistory();
   saveBoard();
 }
 document.addEventListener("keydown", (e) => {
-  if (!whiteboardActive || !(e.ctrlKey || e.metaKey)) return;
+  if (!whiteboardActive || anyOverlayOpen() || !(e.ctrlKey || e.metaKey)) return;
   const active = document.activeElement;
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
   const key = e.key.toLowerCase();
@@ -3490,7 +3725,7 @@ function commitMarquee() {
 // Spacebar held = temporary pan override on the Select tool (Figma-style),
 // so a plain click-drag stays free for marquee selection.
 document.addEventListener("keydown", (e) => {
-  if (!whiteboardActive || e.code !== "Space") return;
+  if (!whiteboardActive || anyOverlayOpen() || e.code !== "Space") return;
   const active = document.activeElement;
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
   e.preventDefault();
@@ -3502,7 +3737,7 @@ document.addEventListener("keyup", (e) => {
   if (!wbPanState) whiteboardSvg.style.cursor = "";
 });
 document.addEventListener("keydown", (e) => {
-  if (!whiteboardActive || e.key.toLowerCase() !== "a" || !(e.ctrlKey || e.metaKey)) return;
+  if (!whiteboardActive || anyOverlayOpen() || e.key.toLowerCase() !== "a" || !(e.ctrlKey || e.metaKey)) return;
   const active = document.activeElement;
   // Editing a whiteboard text box (or any other field) should still get
   // the browser's normal select-all-text-in-this-field behavior, not have
@@ -3515,7 +3750,7 @@ document.addEventListener("keydown", (e) => {
   renderWhiteboardSelection();
 });
 document.addEventListener("keydown", (e) => {
-  if (!whiteboardActive || e.key.toLowerCase() !== "c" || !(e.ctrlKey || e.metaKey)) return;
+  if (!whiteboardActive || anyOverlayOpen() || e.key.toLowerCase() !== "c" || !(e.ctrlKey || e.metaKey)) return;
   const active = document.activeElement;
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
   if (wbSelectedShapeIds.size === 0) return;
@@ -3563,9 +3798,19 @@ document.addEventListener("mousemove", (e) => {
   if (wbMarqueeState) { updateMarquee(e); return; }
   if (wbDragState) {
     const wb = getActiveWhiteboard();
+    // A few px of slack before anything counts as a drag, so a plain click
+    // never moves, detaches, or adds an undo step.
+    if (!wbDragState.moved) {
+      if (Math.hypot(e.clientX - wbDragState.startClientX, e.clientY - wbDragState.startClientY) < 3) return;
+      wbDragState.moved = true;
+      wbDetachForDrag(wb, wbDragState.ids);
+    }
     const cur = wbClientToWorld(e.clientX, e.clientY);
     let dx = cur.x - wbDragState.startX;
-    const dy = cur.y - wbDragState.startY;
+    let dy = cur.y - wbDragState.startY;
+    // Shift locks the move to straight horizontal or vertical.
+    const lockedVertical = e.shiftKey && Math.abs(dy) > Math.abs(dx);
+    if (e.shiftKey) { if (lockedVertical) dx = 0; else dy = 0; }
     // Snapping the dragged shapes' combined bounding box onto the page's
     // own vertical center line - a distinct, deliberate snap target (not
     // just whatever the grid happens to land on), so it gets its own
@@ -3573,7 +3818,7 @@ document.addEventListener("mousemove", (e) => {
     // lines. Reuses the existing snap-to-grid toggle rather than adding a
     // separate one, per how the feature was asked for ("when snap is on").
     wbCenterSnapActive = false;
-    if (wbSnapToGrid) {
+    if (wbSnapToGrid && !lockedVertical) {
       let minX = Infinity, maxX = -Infinity;
       wbDragState.ids.forEach((id) => {
         const orig = wbDragState.origins[id];
@@ -3583,14 +3828,31 @@ document.addEventListener("mousemove", (e) => {
         maxX = Math.max(maxX, box.x + box.width);
       });
       if (minX !== Infinity) {
-        const groupCenterX = (minX + maxX) / 2 + dx;
+        // Checked against the raw (un-grid-snapped) cursor: grid-stepped dx
+        // only moves in whole grid units, so a shape whose width puts its
+        // center between grid lines (common for text boxes) could never
+        // land within the threshold at all.
+        const rawDx = wbClientToWorld(e.clientX, e.clientY, true).x - wbDragState.startX;
+        const origCenterX = (minX + maxX) / 2;
         const pageCenterX = WB_PAGE_WIDTH / 2;
         const threshold = 6 / wb.viewport.zoom; // ~6 screen px regardless of zoom
-        if (Math.abs(groupCenterX - pageCenterX) <= threshold) {
-          dx += pageCenterX - groupCenterX;
+        if (Math.abs(origCenterX + rawDx - pageCenterX) <= threshold) {
+          dx = pageCenterX - origCenterX;
           wbCenterSnapActive = true;
         }
       }
+    }
+    // Always on (grid snap or not): a connector attached to what's being
+    // dragged pulls the drag the last few px so it lies perfectly
+    // horizontal/vertical. Checked from the raw cursor, like the center
+    // snap, so grid steps can't skip over the aligned spot.
+    {
+      const raw = wbClientToWorld(e.clientX, e.clientY, true);
+      let rdx = raw.x - wbDragState.startX, rdy = raw.y - wbDragState.startY;
+      if (e.shiftKey) { if (lockedVertical) rdx = 0; else rdy = 0; }
+      const fix = wbConnectorStraightenSnap(wb, wbDragState, rdx, rdy);
+      if (fix.y !== null && !(e.shiftKey && !lockedVertical)) dy = fix.y;
+      if (fix.x !== null && !(e.shiftKey && lockedVertical) && !wbCenterSnapActive) dx = fix.x;
     }
     wbDragState.ids.forEach((id) => {
       const shape = wb.shapes.find((s) => s.id === id);
@@ -3617,9 +3879,10 @@ document.addEventListener("mousemove", (e) => {
     const shape = wb.shapes.find((s) => s.id === wbResizeState.id);
     if (shape) {
       const cur = wbClientToWorld(e.clientX, e.clientY);
+      // Shift: straight 45-degree steps around the point that isn't moving.
       if (WB_VECTOR_TOOLS.has(shape.type)) {
-        if (wbResizeState.handle === "start") { shape.x1 = cur.x; shape.y1 = cur.y; }
-        else if (wbResizeState.handle === "end") { shape.x2 = cur.x; shape.y2 = cur.y; }
+        if (wbResizeState.handle === "start") { const p = e.shiftKey ? wbAngleSnap(shape.x2, shape.y2, cur.x, cur.y) : cur; shape.x1 = p.x; shape.y1 = p.y; }
+        else if (wbResizeState.handle === "end") { const p = e.shiftKey ? wbAngleSnap(shape.x1, shape.y1, cur.x, cur.y) : cur; shape.x2 = p.x; shape.y2 = p.y; }
         else if (wbResizeState.handle === "width") {
           const perp = wbBlockArrowPerp(shape);
           const midX = (shape.x1 + shape.x2) / 2;
@@ -3629,9 +3892,11 @@ document.addEventListener("mousemove", (e) => {
           shape.thickness = Math.max(WB_BLOCK_ARROW_MIN_THICKNESS, Math.min(Math.abs(dist), length / 2 - 2));
         }
       } else if (shape.type === "branch") {
-        if (wbResizeState.handle === "branch-top") { shape.x1 = cur.x; shape.y1 = cur.y; }
-        else if (wbResizeState.handle === "branch-left") { shape.x2 = cur.x; shape.y2 = cur.y; }
-        else if (wbResizeState.handle === "branch-right") { shape.x3 = cur.x; shape.y3 = cur.y; }
+        const fork = wbBranchForkPoint(shape);
+        const p = e.shiftKey ? wbAngleSnap(fork.x, fork.y, cur.x, cur.y) : cur;
+        if (wbResizeState.handle === "branch-top") { shape.x1 = p.x; shape.y1 = p.y; }
+        else if (wbResizeState.handle === "branch-left") { shape.x2 = p.x; shape.y2 = p.y; }
+        else if (wbResizeState.handle === "branch-right") { shape.x3 = p.x; shape.y3 = p.y; }
         else if (wbResizeState.handle === "branch-fork") {
           // Projects the cursor onto the actual stem line (top point toward
           // the midpoint of the two endpoints) rather than assuming that
@@ -3656,6 +3921,16 @@ document.addEventListener("mousemove", (e) => {
         if (h < WB_MIN_SHAPE_SIZE) { if (corner.includes("n")) y = wbResizeState.origY + wbResizeState.origH - WB_MIN_SHAPE_SIZE; h = WB_MIN_SHAPE_SIZE; }
         shape.x = x; shape.y = y; shape.width = w; shape.height = h;
       }
+      // Pin preview for a connector end being dragged over a shape.
+      const h = wbResizeState.handle;
+      if (WB_SNAP_SOURCE_TYPES.has(shape.type) && (h === "start" || h === "end")) {
+        if (h === "start") wbUpdatePinPreview(wb, shape.x1, shape.y1, shape.x2, shape.y2);
+        else wbUpdatePinPreview(wb, shape.x2, shape.y2, shape.x1, shape.y1);
+      } else if (shape.type === "branch" && h !== "branch-fork") {
+        const pt = wbBranchHandlePoint(shape, h);
+        const fork = wbBranchForkPoint(shape);
+        wbUpdatePinPreview(wb, pt.x, pt.y, fork.x, fork.y);
+      }
       renderWhiteboardCanvas();
     }
     return;
@@ -3670,11 +3945,18 @@ document.addEventListener("mouseup", (e) => {
     return;
   }
   if (wbPenDrawState) { wbCommitPenStroke(); return; }
-  if (wbDrawState) { commitDrawShape(); return; }
+  if (wbDrawState) { wbClearPinPreview(); commitDrawShape(); return; }
   if (wbMarqueeState) { commitMarquee(); return; }
   if (wbDragState) {
+    const state = wbDragState;
     wbDragState = null;
     wbCenterSnapActive = false;
+    if (!state.moved) {
+      // Just a click: Shift+click on an already-selected shape toggles it
+      // off (see wbWireShapeMousedown); nothing to save or re-render.
+      if (state.toggleOffId) wbToggleSelect(state.toggleOffId);
+      return;
+    }
     renderWhiteboardCanvas();
     wbPushHistory();
     saveBoard();
@@ -3683,14 +3965,20 @@ document.addEventListener("mouseup", (e) => {
   if (wbResizeState) {
     const wb = getActiveWhiteboard();
     const shape = wb.shapes.find((s) => s.id === wbResizeState.id);
-    if (shape && WB_SNAP_SOURCE_TYPES.has(shape.type)) {
-      const cur = wbClientToWorld(e.clientX, e.clientY);
-      wbAttachEndpoint(shape, wbResizeState.handle, wb, cur.x, cur.y);
+    wbPinPreview = null;
+    // Attach from where the end actually is (not the raw cursor), so a
+    // Shift angle-snap isn't undone on release.
+    const h = wbResizeState.handle;
+    if (shape && WB_SNAP_SOURCE_TYPES.has(shape.type) && (h === "start" || h === "end")) {
+      const pt = h === "start" ? { x: shape.x1, y: shape.y1 } : { x: shape.x2, y: shape.y2 };
+      wbAttachEndpoint(shape, h, wb, pt.x, pt.y);
       renderWhiteboardCanvas();
-    } else if (shape && shape.type === "branch" && wbResizeState.handle.startsWith("branch-") && wbResizeState.handle !== "branch-fork") {
-      const cur = wbClientToWorld(e.clientX, e.clientY);
-      wbAttachBranchEndpoint(shape, wbResizeState.handle.replace("branch-", ""), wb, cur.x, cur.y);
+    } else if (shape && shape.type === "branch" && h.startsWith("branch-") && h !== "branch-fork") {
+      const pt = wbBranchHandlePoint(shape, h);
+      wbAttachBranchEndpoint(shape, h.replace("branch-", ""), wb, pt.x, pt.y);
       renderWhiteboardCanvas();
+    } else {
+      wbClearPinPreview();
     }
     wbResizeState = null;
     wbPushHistory();
@@ -3699,7 +3987,7 @@ document.addEventListener("mouseup", (e) => {
   }
 });
 document.addEventListener("keydown", (e) => {
-  if (!whiteboardActive || wbSelectedShapeIds.size === 0) return;
+  if (!whiteboardActive || anyOverlayOpen() || wbSelectedShapeIds.size === 0) return;
   if (e.key !== "Delete" && e.key !== "Backspace") return;
   // Renaming a page (or anything else focused) should type Backspace
   // normally, not delete a shape behind it.
@@ -3708,7 +3996,7 @@ document.addEventListener("keydown", (e) => {
   const wb = getActiveWhiteboard();
   const removed = wb.shapes.filter((s) => wbSelectedShapeIds.has(s.id));
   wb.shapes = wb.shapes.filter((s) => !wbSelectedShapeIds.has(s.id));
-  wbDeletePhotoFilesForShapes(removed);
+  wbDeferPhotoFileDeletes(removed);
   wbClearSelection();
   renderWhiteboardCanvas();
   wbPushHistory();
@@ -3876,7 +4164,7 @@ document.getElementById("wb-clear-page-btn").addEventListener("click", () => {
   const wb = getActiveWhiteboard();
   if (!wb.shapes.length) return;
   openConfirmPopover(`Clear everything on "${wb.name}"?`, () => {
-    wbDeletePhotoFilesForShapes(wb.shapes);
+    wbDeferPhotoFileDeletes(wb.shapes);
     wb.shapes = [];
     // With nothing left, wherever the viewport happened to be panned to is
     // meaningless - reset to null so the upcoming renderWhiteboardCanvas
@@ -3953,21 +4241,59 @@ updateWbPenWidthButtons();
 const WB_PHOTO_MAX_DIM = 280;
 // Photo bytes live on disk (via Rust), not in the JSON - same reasoning and
 // same lazy in-memory-only cache pattern as backgroundImageCache.
+// Holds short blob: URLs (not multi-MB data: URLs, which were re-parsed on
+// every render - i.e. every drag frame), or null for a file known to be
+// missing, so a missing one isn't re-requested from disk on every render.
 const wbPhotoCache = new Map();
+const wbPhotoLoads = new Map(); // id -> in-flight load, so preload + render never fetch twice
+function wbPhotoUrlFromBase64(base64, mimeType) {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType || "image/png" }));
+}
+function wbForgetPhoto(id) {
+  const url = wbPhotoCache.get(id);
+  if (url) URL.revokeObjectURL(url);
+  wbPhotoCache.delete(id);
+}
+// Loads the current board's photos on every page in the background, one at
+// a time, so switching pages doesn't wait on disk.
+async function wbPreloadBoardPhotos() {
+  const b = board;
+  for (const w of b.whiteboards || []) {
+    for (const s of w.shapes) {
+      if (s.type !== "photo" || wbPhotoCache.has(s.id)) continue;
+      if (b !== board) return; // switched boards - stop
+      await wbGetPhotoDataUrl(s);
+    }
+  }
+}
 // Which photo ids are currently known to be missing their file - drives
 // both the broken-image placeholder on canvas and whether the right-click
 // menu offers "Locate File...".
 const wbBrokenPhotoIds = new Set();
 async function wbGetPhotoDataUrl(shape) {
   if (wbPhotoCache.has(shape.id)) return wbPhotoCache.get(shape.id);
-  try {
-    const base64 = await invoke("load_wb_photo", { photoId: shape.id });
-    const url = `data:${shape.mimeType || "image/png"};base64,${base64}`;
+  if (wbPhotoLoads.has(shape.id)) return wbPhotoLoads.get(shape.id);
+  const load = (async () => {
+    let url = null;
+    try {
+      const base64 = await invoke("load_wb_photo", { photoId: shape.id });
+      url = wbPhotoUrlFromBase64(base64, shape.mimeType);
+      // Decode now, so it's ready the moment its page is shown.
+      const im = new Image();
+      im.src = url;
+      if (im.decode) await im.decode().catch(() => {});
+    } catch (err) {
+      url = null;
+    }
     wbPhotoCache.set(shape.id, url);
+    wbPhotoLoads.delete(shape.id);
     return url;
-  } catch (err) {
-    return null;
-  }
+  })();
+  wbPhotoLoads.set(shape.id, load);
+  return load;
 }
 // Every place a "photo" shape can be removed from wb.shapes - deleting one
 // shape, deleting a multi-selection, clearing a page, deleting a whole
@@ -3975,10 +4301,20 @@ async function wbGetPhotoDataUrl(shape) {
 // orphaned on disk (the JSON side self-cleans on the next save since it's
 // just an inline reference, but a separate file on disk never does unless
 // something explicitly removes it).
+// Deleting a photo shape (right-click Delete, Delete key, Clear page) can
+// be undone, so its file and cached image are kept for now - the id is
+// only noted here, and the startup sweep (wbSweepAssetIssues) removes the
+// file quietly if nothing uses it by then. Page/board deletes can't be
+// undone and still use wbDeletePhotoFilesForShapes right away.
+function wbDeferPhotoFileDeletes(shapes) {
+  const pending = new Set(appData.wbPendingPhotoDeletes || []);
+  shapes.forEach((s) => { if (s.type === "photo") pending.add(s.id); });
+  appData.wbPendingPhotoDeletes = [...pending];
+}
 function wbDeletePhotoFilesForShapes(shapes) {
   shapes.forEach((s) => {
     if (s.type !== "photo") return;
-    wbPhotoCache.delete(s.id);
+    wbForgetPhoto(s.id);
     // Deleted on purpose, right now - no need to remember where it used to
     // live for a future orphan-cleanup message, unlike the undo-truncation
     // path where the registry entry is what's left of that context.
@@ -4009,7 +4345,7 @@ function wbCommitPhotoShape(mimeType, base64Data, dataUrl, fileName, worldX, wor
       openAlertPopover("Couldn't save that image - please try a different file.");
       return;
     }
-    wbPhotoCache.set(shape.id, dataUrl);
+    wbPhotoCache.set(shape.id, wbPhotoUrlFromBase64(base64Data, mimeType));
     const wb = getActiveWhiteboard();
     wb.shapes.push(shape);
     appData.wbPhotoRegistry[shape.id] = { originalName: shape.originalName, boardName: board.name, pageName: wb.name };
@@ -4061,7 +4397,7 @@ async function wbCreatePhotoFromPath(path, worldX, worldY) {
 // The OS-clipboard-image path is the fallback, for when nothing's been
 // copied in-app yet.
 document.addEventListener("paste", (e) => {
-  if (!whiteboardActive) return;
+  if (!whiteboardActive || anyOverlayOpen()) return;
   const active = document.activeElement;
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
   if (wbClipboard.length) {
@@ -4159,7 +4495,7 @@ const WB_ASSET_KINDS = [
       return out;
     },
     onRelinked(id, mimeType, fileName) {
-      wbPhotoCache.delete(id);
+      wbForgetPhoto(id);
       wbBrokenPhotoIds.delete(id);
       for (const b of [...appData.boards, ...appData.archivedBoards]) {
         for (const w of b.whiteboards || []) {
@@ -4173,6 +4509,7 @@ const WB_ASSET_KINDS = [
               s.originalName = fileName;
               if (appData.wbPhotoRegistry[id]) appData.wbPhotoRegistry[id].originalName = fileName;
             }
+            wbResetPageHistory(w);
             renderWhiteboardCanvas();
             return;
           }
@@ -4188,13 +4525,13 @@ const WB_ASSET_KINDS = [
       if (appData.wbPhotoRegistry) delete appData.wbPhotoRegistry[id];
     },
     onReferenceRemoved(id) {
-      wbPhotoCache.delete(id);
+      wbForgetPhoto(id);
       wbBrokenPhotoIds.delete(id);
       for (const b of [...appData.boards, ...appData.archivedBoards]) {
         for (const w of b.whiteboards || []) {
           const before = w.shapes.length;
           w.shapes = w.shapes.filter((s) => s.id !== id);
-          if (w.shapes.length !== before) { renderWhiteboardCanvas(); return; }
+          if (w.shapes.length !== before) { wbResetPageHistory(w); renderWhiteboardCanvas(); return; }
         }
       }
     },
@@ -4260,6 +4597,11 @@ async function wbRemoveMissingAssetReference(item) {
 async function wbSweepAssetIssues() {
   const orphanItems = [];
   const missing = [];
+  // Photos deleted on purpose last session (see wbDeferPhotoFileDeletes) -
+  // cleaned up silently, not reported as surprise orphans.
+  const intentional = new Set(appData.wbPendingPhotoDeletes || []);
+  const hadPending = intentional.size > 0;
+  appData.wbPendingPhotoDeletes = [];
   for (const kind of WB_ASSET_KINDS) {
     let onDisk;
     try { onDisk = new Set(await invoke(kind.listCmd)); } catch (err) { continue; }
@@ -4269,6 +4611,10 @@ async function wbSweepAssetIssues() {
       if (!referencedIds.has(id)) {
         try {
           await invoke(kind.deleteCmd, { [kind.deleteIdParam]: id });
+          if (intentional.has(id)) {
+            if (kind.cleanupOrphanRecord) kind.cleanupOrphanRecord(id);
+            continue;
+          }
           // The registry (wb-photo only) still remembers where an orphan
           // used to live even though its shape is gone - use that for the
           // popup's list if present, then retire the record now that
@@ -4284,6 +4630,8 @@ async function wbSweepAssetIssues() {
   }
   if (orphanItems.length > 0) {
     wbShowOrphanCleanupPopover(orphanItems);
+    saveBoard();
+  } else if (hadPending) {
     saveBoard();
   }
   if (missing.length) {
@@ -4391,6 +4739,7 @@ function confirmDeleteBoard(b) {
       appData.activeBoardId = appData.boards[0].id;
       board = appData.boards[0];
       syncBoardBackground();
+      wbRefreshForBoardChange();
     }
     renderBoardTitle();
     renderSidebar();
@@ -4412,6 +4761,7 @@ function archiveBoard(b) {
     appData.activeBoardId = appData.boards[0].id;
     board = appData.boards[0];
     syncBoardBackground();
+    wbRefreshForBoardChange();
   }
   renderBoardTitle();
   renderSidebar();
@@ -4836,7 +5186,7 @@ async function applyImportedBackup(parsed) {
   }
   appData = imported;
   backgroundImageCache.clear();
-  wbPhotoCache.clear();
+  [...wbPhotoCache.keys()].forEach(wbForgetPhoto);
   board = appData.boards.find((b) => b.id === appData.activeBoardId) || appData.boards[0];
   applyTheme(appData.theme);
   applyPattern(appData.pattern);
