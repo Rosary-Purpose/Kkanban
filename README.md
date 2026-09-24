@@ -17,7 +17,11 @@ A desktop kanban board built with [Tauri](https://tauri.app/) — vanilla HTML/C
 - **Checklists** — per-card checklists with drag-to-reorder items, plus a live checklist preview right on the board card (check items off without opening the card)
 - **Calendar view** — see every card with a due date laid out by month
 - **Due-time alarms** — Windows notifications when a timed card or board is due, with a button that opens kkanban straight to that card
-- **Whiteboard** — a per-board sketch canvas with multiple pages: shapes, freehand pen, attachable connector arrows, text, pasted/dropped images, copy/paste, and undo/redo
+- **Whiteboard** — a per-board sketch canvas (up to 10 pages each) for flowcharts and planning:
+  - rectangles, ellipses, diamonds and block arrows, each with a color and a filled/outline toggle, plus text labels inside any of them
+  - freehand pen with colors and widths, and an eraser that removes whole strokes or just the section between line crossings
+  - arrows, lines and a branch (Y/T fork) tool that attach to pins on shapes and re-route when shapes move, with automatic straightening
+  - standalone rich text boxes, pasted/dropped images, copy/paste, undo/redo, pan/zoom, snap-to-grid and Shift-to-straighten
 - **Board backgrounds** — custom image backgrounds with adjustable blur
 - **Themes** — Dark, Light, Lavender, and a seasonal Christmas theme, plus optional background patterns
 - **Pomodoro timer** — full work/break session planner (configurable lengths, session count, long-break cadence), two visual styles (tomato/milk), a floating on-board overlay with its own quick controls, and a header hover popover for pause/skip/reset without opening the panel
@@ -25,6 +29,8 @@ A desktop kanban board built with [Tauri](https://tauri.app/) — vanilla HTML/C
 - **Backups** — one-click export/import of everything (including images), plus automatic daily backups (last 14 kept)
 
 ## Screenshots
+
+![Whiteboard page sketching a game's "meeting phase": colored shapes joined by pinned arrows, a block arrow, a diamond note, and freehand character drawings](docs/screenshots/whiteboard.jpg)
 
 | Card detail | Pomodoro timer | Lavender theme |
 | --- | --- | --- |
