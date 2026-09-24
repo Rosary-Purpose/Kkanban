@@ -2003,6 +2003,10 @@ document.querySelectorAll(".wb-tool-btn[data-tool]").forEach((btn) => {
       wbToggleBranchStyle();
       return;
     }
+    if (tool === "eraser" && wbTool === "eraser") {
+      wbToggleEraserMode();
+      return;
+    }
     setWbTool(tool);
     if (tool !== "select") wbClearSelection();
   });
@@ -3798,7 +3802,7 @@ whiteboardSvg.addEventListener("mousedown", (e) => {
     return;
   }
   if (wbTool === "eraser") {
-    wbEraseState = { last: null, erased: false };
+    wbEraseState = { last: null, erased: false, createdIds: new Set() };
     wbEraseAt(e);
     return;
   }
@@ -3843,11 +3847,150 @@ function wbEraseAt(e) {
       if (wbPointNearStroke(q, s, tol)) { hit.add(s.id); break; }
     }
   });
+  if (wbEraserMode === "cross") {
+    // Up-to-crossings mode: each sample point trims the stroke under it back
+    // to its nearest crossings instead of removing the whole thing.
+    let changed = false;
+    for (let i = 0; i <= steps; i++) {
+      const q = { x: prev.x + ((p.x - prev.x) * i) / steps, y: prev.y + ((p.y - prev.y) * i) / steps };
+      if (wbEraseCrossingSectionAt(wb, q, r)) changed = true;
+    }
+    if (!changed) return;
+    wbEraseState.erased = true;
+    renderWhiteboardCanvas();
+    return;
+  }
   if (!hit.size) return;
   wb.shapes = wb.shapes.filter((s) => !hit.has(s.id));
   hit.forEach((id) => wbSelectedShapeIds.delete(id));
   wbEraseState.erased = true;
   renderWhiteboardCanvas();
+}
+
+// ----- Eraser: "up to crossings" mode -----
+// Clicking the active eraser button toggles modes. In this one, touching a
+// pen stroke removes only the part between the nearest places where it
+// crosses (or is touched by) another pen stroke - or crosses itself. A
+// stroke with no crossings is removed whole, same as the normal mode.
+// Shapes, text, photos and Line-tool lines are never boundaries.
+let wbEraserMode = "stroke";
+function wbToggleEraserMode() {
+  wbEraserMode = wbEraserMode === "stroke" ? "cross" : "stroke";
+  const btn = document.querySelector('.wb-tool-btn[data-tool="eraser"]');
+  btn.classList.toggle("wb-eraser-cross", wbEraserMode === "cross");
+  btn.title = wbEraserMode === "cross"
+    ? "Eraser: up to line crossings (click again for whole strokes)"
+    : "Eraser: whole strokes (click again for up to line crossings)";
+  showToast(wbEraserMode === "cross" ? "Eraser: erases up to where lines cross" : "Eraser: erases whole strokes", { duration: 2500 });
+}
+// A position along a stroke as "segment index + fraction" (0 .. points-1).
+function wbStrokePointAt(pts, u) {
+  if (pts.length === 1) return { ...pts[0] };
+  const i = Math.max(0, Math.min(Math.floor(u), pts.length - 2));
+  const t = u - i;
+  return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t };
+}
+function wbClosestOnStroke(q, pts) {
+  if (pts.length === 1) return { u: 0, dist: Math.hypot(q.x - pts[0].x, q.y - pts[0].y) };
+  let best = { u: 0, dist: Infinity };
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    const t = lenSq ? Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / lenSq)) : 0;
+    const d = Math.hypot(q.x - (a.x + t * dx), q.y - (a.y + t * dy));
+    if (d < best.dist) best = { u: i + t, dist: d };
+  }
+  return best;
+}
+// Where segment a-b crosses segment c-d, as a fraction along a-b, or null.
+function wbSegmentCross(a, b, c, d) {
+  const rX = b.x - a.x, rY = b.y - a.y, sX = d.x - c.x, sY = d.y - c.y;
+  const denom = rX * sY - rY * sX;
+  if (!denom) return null;
+  const t = ((c.x - a.x) * sY - (c.y - a.y) * sX) / denom;
+  const v = ((c.x - a.x) * rY - (c.y - a.y) * rX) / denom;
+  return t >= 0 && t <= 1 && v >= 0 && v <= 1 ? t : null;
+}
+function wbPointsBox(pts, pad) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  pts.forEach((p) => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
+  return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+}
+// Every place (as u positions) where stroke s is crossed by, touched by the
+// end of, or crosses itself - its "section boundaries".
+function wbStrokeCuts(wb, s) {
+  const pts = s.points;
+  const cuts = [];
+  const nearTol = 2 / wb.viewport.zoom;
+  const box = wbPointsBox(pts, 20);
+  wb.shapes.forEach((o) => {
+    if (o.type !== "pen" || !o.points.length) return;
+    const op = o.points;
+    if (o !== s) {
+      const ob = wbPointsBox(op, 0);
+      if (ob.maxX < box.minX || ob.minX > box.maxX || ob.maxY < box.minY || ob.minY > box.maxY) return;
+    }
+    for (let i = 0; i < pts.length - 1; i++) {
+      for (let j = 0; j < op.length - 1; j++) {
+        if (o === s && Math.abs(i - j) < 2) continue; // neighbouring segments always meet
+        const t = wbSegmentCross(pts[i], pts[i + 1], op[j], op[j + 1]);
+        if (t !== null) cuts.push(i + t);
+      }
+    }
+    // A stroke that ends on (or a hair short of) this one also splits it.
+    if (o !== s) {
+      const tol = (o.width || 3) / 2 + (s.width || 3) / 2 + nearTol;
+      [op[0], op[op.length - 1]].forEach((ep) => {
+        const c = wbClosestOnStroke(ep, pts);
+        if (c.dist <= tol) cuts.push(c.u);
+      });
+    }
+  });
+  return cuts;
+}
+function wbStrokeLength(pts) {
+  let len = 0;
+  for (let i = 0; i < pts.length - 1; i++) len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+  return len;
+}
+// Trims the section of whichever pen stroke is under q. Returns true if
+// anything changed.
+function wbEraseCrossingSectionAt(wb, q, r) {
+  // Topmost stroke under the eraser. Pieces this same drag already cut are
+  // ignored right at their ends - the eraser is usually still sitting on
+  // that crossing, and would otherwise eat the next section too.
+  let target = null, hitU = 0;
+  for (let i = wb.shapes.length - 1; i >= 0; i--) {
+    const s = wb.shapes[i];
+    if (s.type !== "pen" || !s.points.length) continue;
+    const c = wbClosestOnStroke(q, s.points);
+    if (c.dist > r + (s.width || 3) / 2) continue;
+    const last = s.points.length - 1;
+    if (wbEraseState.createdIds.has(s.id) && (c.u < 0.01 || c.u > last - 0.01)) continue;
+    target = s; hitU = c.u;
+    break;
+  }
+  if (!target) return false;
+  const pts = target.points;
+  const last = pts.length - 1;
+  let lo = -Infinity, hi = Infinity;
+  wbStrokeCuts(wb, target).forEach((u) => {
+    if (u < hitU - 1e-6 && u > lo) lo = u;
+    if (u > hitU + 1e-6 && u < hi) hi = u;
+  });
+  const pieces = [];
+  if (lo > 0) pieces.push([...pts.slice(0, Math.floor(lo) + 1), wbStrokePointAt(pts, lo)]);
+  if (hi < last) pieces.push([wbStrokePointAt(pts, hi), ...pts.slice(Math.ceil(hi))]);
+  const minLen = 1 / wb.viewport.zoom;
+  const newShapes = pieces
+    .filter((piece) => piece.length >= 2 && wbStrokeLength(piece) > minLen)
+    .map((piece) => ({ ...target, id: crypto.randomUUID(), points: piece }));
+  newShapes.forEach((s) => wbEraseState.createdIds.add(s.id));
+  const idx = wb.shapes.indexOf(target);
+  wb.shapes.splice(idx, 1, ...newShapes); // keeps the pieces at the same layer
+  wbSelectedShapeIds.delete(target.id);
+  return true;
 }
 document.addEventListener("mousemove", (e) => {
   if (wbPanState) {
@@ -4253,7 +4396,7 @@ document.getElementById("wb-clear-page-btn").addEventListener("click", () => {
 
 const wbPenColorDot = document.getElementById("wb-pen-color-dot");
 function updateWbPenColorDot() {
-  wbPenColorDot.style.background = wbPenColor;
+  wbPenColorDot.setAttribute("fill", wbPenColor);
 }
 updateWbPenColorDot();
 document.getElementById("wb-pen-color-btn").addEventListener("click", (e) => {

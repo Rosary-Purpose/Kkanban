@@ -510,7 +510,9 @@ body {
 }
 #wb-text-format-group { display: flex; align-items: center; gap: 4px; }
 #wb-pen-options-group { display: flex; align-items: center; gap: 4px; }
-#wb-pen-color-dot { display: block; width: 14px; height: 14px; border-radius: 50%; background: #2b2b2b; border: 1px solid rgba(0,0,0,0.2); }
+/* Pen color: a dripping paint splash filled with the current color (a plain
+   dot looked too much like the width dot next to it). */
+#wb-pen-color-icon { display: block; }
 #wb-pen-width-reset { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 40px; padding: 0 6px; }
 /* Grows/shrinks with the actual chosen width, so the stepper itself shows
    what the next stroke will look like instead of just a number. */
@@ -563,6 +565,18 @@ body {
   background: #fff;
   border: 1px solid var(--accent);
 }
+/* Eraser in "up to crossings" mode: a small ✕ (crossing lines) badge. */
+.wb-tool-btn.wb-eraser-cross::after {
+  content: "\2715";
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+}
+.wb-tool-btn.wb-eraser-cross.active::after { color: #fff; }
 .wb-tool-btn svg { display: block; }
 .wb-tool-btn[data-tool="text"] { font-weight: 700; }
 #wb-marquee { fill: rgba(47, 111, 237, 0.15); stroke: #2f6fed; stroke-width: 1; pointer-events: none; }
