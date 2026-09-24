@@ -89,6 +89,9 @@
           </button>
           <button type="button" class="wb-tool-btn" id="wb-pen-width-inc" title="Thicker">+</button>
         </span>
+        <button type="button" class="wb-tool-btn" data-tool="eraser" title="Eraser (removes whole pen strokes)">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3.5 13 11 5.5a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L9.5 17H7.5z"/><path d="M7.5 9 12 13.5"/><path d="M9.5 17H17"/></svg>
+        </button>
         <span class="wb-toolbar-sep"></span>
         <button type="button" class="wb-tool-btn" id="wb-insert-image-btn" title="Insert Image">&#128444;&#65039;</button>
         <button type="button" class="wb-tool-btn" id="wb-clear-page-btn" title="Clear page">&#128465;&#65039;</button>
@@ -129,7 +132,7 @@
         </span>
       </div>
       <div id="whiteboard-canvas-wrap">
-        <svg id="whiteboard-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <svg id="whiteboard-svg" data-tool="select" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
     </div>
   </div>

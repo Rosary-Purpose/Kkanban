@@ -630,6 +630,15 @@ body {
   touch-action: none;
 }
 #whiteboard-svg.panning { cursor: grabbing; }
+/* Shapes carry an inline "move" cursor for the Select tool - with any other
+   tool they just show the tool's own cursor instead. */
+#whiteboard-svg:not([data-tool="select"]) [data-shape-id] { cursor: inherit !important; }
+#whiteboard-svg [contenteditable="true"] { cursor: text !important; }
+#whiteboard-svg[data-tool="pen"] { cursor: crosshair; }
+/* Eraser: a hollow circle matching its reach (WB_ERASER_RADIUS_PX). */
+#whiteboard-svg[data-tool="eraser"] {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><circle cx='10' cy='10' r='8' fill='white' fill-opacity='0.35' stroke='black' stroke-width='1.5'/></svg>") 10 10, crosshair;
+}
 
 #board-background {
   position: fixed;

@@ -1884,6 +1884,7 @@ function updateWbToolbarGroups() {
 
 function setWbTool(tool) {
   wbTool = tool;
+  whiteboardSvg.dataset.tool = tool; // drives the canvas cursor (styles.css)
   // [data-tool] specifically - the toolbar's zoom/grid/snap/clear buttons
   // share the plain .wb-tool-btn class purely for matching visual styling,
   // not because they're tool selectors. Querying the bare class caught them
@@ -2325,7 +2326,9 @@ function wbWireShapeMousedown(el, shape) {
     // rather than a dblclick listener: the first press selects the shape,
     // which re-renders the canvas and replaces this element, so a dblclick
     // event never reaches it. Works with any tool, same as before.
-    if (e.detail === 2 && !el.isContentEditable) {
+    // (Not while drawing with the pen or erasing - a quick double-tap there
+    // is just more drawing/erasing, not a request to edit text.)
+    if (e.detail === 2 && !el.isContentEditable && wbTool !== "pen" && wbTool !== "eraser") {
       const div = document.querySelector(`.wb-text-editor[data-shape-id="${target.id}"]`);
       if (div) {
         e.preventDefault();
@@ -3779,12 +3782,58 @@ whiteboardSvg.addEventListener("mousedown", (e) => {
     wbStartPenStroke(e);
     return;
   }
+  if (wbTool === "eraser") {
+    wbEraseState = { last: null, erased: false };
+    wbEraseAt(e);
+    return;
+  }
   if (wbTool !== "select") {
     startDrawShape(e);
     return;
   }
   startMarquee(e);
 });
+
+// ----- Whiteboard: eraser -----
+// Drag over pen strokes to remove them - each stroke touched goes as a
+// whole (no partial erasing). Only pen strokes; shapes, text and photos
+// are left alone. One undo step per drag.
+const WB_ERASER_RADIUS_PX = 8;
+let wbEraseState = null;
+function wbPointNearStroke(q, s, tol) {
+  const pts = s.points;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1] || a;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    const t = lenSq ? Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / lenSq)) : 0;
+    if (Math.hypot(q.x - (a.x + t * dx), q.y - (a.y + t * dy)) <= tol) return true;
+  }
+  return false;
+}
+function wbEraseAt(e) {
+  const wb = getActiveWhiteboard();
+  const p = wbClientToWorld(e.clientX, e.clientY, true);
+  const prev = wbEraseState.last || p;
+  wbEraseState.last = p;
+  const r = WB_ERASER_RADIUS_PX / wb.viewport.zoom;
+  // Samples along the move too, so a fast swipe can't skip over a stroke.
+  const steps = Math.max(1, Math.ceil(Math.hypot(p.x - prev.x, p.y - prev.y) / (r / 2)));
+  const hit = new Set();
+  wb.shapes.forEach((s) => {
+    if (s.type !== "pen" || !s.points.length) return;
+    const tol = r + (s.width || 3) / 2;
+    for (let i = 0; i <= steps; i++) {
+      const q = { x: prev.x + ((p.x - prev.x) * i) / steps, y: prev.y + ((p.y - prev.y) * i) / steps };
+      if (wbPointNearStroke(q, s, tol)) { hit.add(s.id); break; }
+    }
+  });
+  if (!hit.size) return;
+  wb.shapes = wb.shapes.filter((s) => !hit.has(s.id));
+  hit.forEach((id) => wbSelectedShapeIds.delete(id));
+  wbEraseState.erased = true;
+  renderWhiteboardCanvas();
+}
 document.addEventListener("mousemove", (e) => {
   if (wbPanState) {
     const wb = getActiveWhiteboard();
@@ -3794,6 +3843,7 @@ document.addEventListener("mousemove", (e) => {
     return;
   }
   if (wbPenDrawState) { wbUpdatePenStroke(e); return; }
+  if (wbEraseState) { wbEraseAt(e); return; }
   if (wbDrawState) { updateDrawShape(e); return; }
   if (wbMarqueeState) { updateMarquee(e); return; }
   if (wbDragState) {
@@ -3945,6 +3995,12 @@ document.addEventListener("mouseup", (e) => {
     return;
   }
   if (wbPenDrawState) { wbCommitPenStroke(); return; }
+  if (wbEraseState) {
+    const erased = wbEraseState.erased;
+    wbEraseState = null;
+    if (erased) { wbPushHistory(); saveBoard(); }
+    return;
+  }
   if (wbDrawState) { wbClearPinPreview(); commitDrawShape(); return; }
   if (wbMarqueeState) { commitMarquee(); return; }
   if (wbDragState) {
