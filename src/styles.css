@@ -510,8 +510,8 @@ body {
 }
 #wb-text-format-group { display: flex; align-items: center; gap: 4px; }
 #wb-pen-options-group { display: flex; align-items: center; gap: 4px; }
-/* Pen color: a dripping paint splash filled with the current color (a plain
-   dot looked too much like the width dot next to it). */
+/* Pen color: a simple palette whose big paint well shows the current color
+   (a plain dot looked too much like the width dot next to it). */
 #wb-pen-color-icon { display: block; }
 #wb-pen-width-reset { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 40px; padding: 0 6px; }
 /* Grows/shrinks with the actual chosen width, so the stepper itself shows
@@ -569,8 +569,8 @@ body {
 .wb-tool-btn.wb-eraser-cross::after {
   content: "\2715";
   position: absolute;
-  right: 1px;
-  bottom: 0;
+  right: 2px;
+  top: 1px;
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
