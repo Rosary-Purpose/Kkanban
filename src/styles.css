@@ -20,6 +20,9 @@ html, body { height: 100%; margin: 0; }
   --border-subtle: #333;
   --accent: #5865f2;
   --pattern-color: rgba(255,255,255,0.07);
+  --text-category: #9aa6ff;
+  --bg-category: rgba(154,166,255,0.10);
+  --bg-category-hover: rgba(154,166,255,0.18);
   --pattern-color-dots: rgba(255,255,255,0.12);
 }
 :root[data-theme="light"] {
@@ -40,6 +43,10 @@ html, body { height: 100%; margin: 0; }
   --border-subtle: #e2e2e6;
   --accent: #5865f2;
   --pattern-color: rgba(0,0,0,0.06);
+  --text-category: #3f4bc4;
+  --bg-category: rgba(63,75,196,0.08);
+  --bg-category-hover: rgba(63,75,196,0.14);
+  --category-line: rgba(63,75,196,0.28);
   --pattern-color-dots: rgba(0,0,0,0.10);
 }
 :root[data-theme="lavender"] {
@@ -59,6 +66,10 @@ html, body { height: 100%; margin: 0; }
   --border-color: #cdbaef;
   --border-subtle: #ddccf5;
   --accent: #8b5cf6;
+  --text-category: #b0408a;
+  --bg-category: rgba(176,64,138,0.10);
+  --bg-category-hover: rgba(176,64,138,0.17);
+  --category-line: rgba(176,64,138,0.32);
   --pattern-color: rgba(139,92,246,0.09);
   --pattern-color-dots: rgba(139,92,246,0.14);
 }
@@ -81,6 +92,9 @@ html, body { height: 100%; margin: 0; }
   --border-color: #8a6d1f;
   --border-subtle: #234a30;
   --accent: #c81d25;
+  --text-category: #e3bd4a;
+  --bg-category: rgba(227,189,74,0.10);
+  --bg-category-hover: rgba(227,189,74,0.18);
   --pattern-color: rgba(212,175,55,0.08);
   --pattern-color-dots: rgba(212,175,55,0.14);
 }
@@ -244,6 +258,11 @@ body {
 }
 #sidebar-menu-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 #boards-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
+/* Same thin themed scrollbar as the columns (.cards). */
+#boards-list { scrollbar-width: thin; scrollbar-color: var(--text-muted) transparent; }
+#boards-list::-webkit-scrollbar { width: 8px; }
+#boards-list::-webkit-scrollbar-track { background: transparent; }
+#boards-list::-webkit-scrollbar-thumb { background-color: var(--text-muted); border-radius: 4px; }
 .board-item {
   padding: 8px 10px;
   border-radius: 6px;
@@ -261,6 +280,51 @@ body {
 .board-item-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; box-shadow: 0 6px 16px rgba(0,0,0,0.5); margin: 0; background: var(--bg-card); }
 .board-item-dragging-source { opacity: 0.3; }
 .board-item-drop-indicator { height: 2px; background: var(--accent); border-radius: 1px; margin: 0 10px 2px; }
+.board-item-drop-indicator.in-category { margin-left: 4px; }
+
+/* ---------- Sidebar categories ---------- */
+/* Header text uses its own theme color (--text-category) so categories read
+   as distinct from the boards listed under them. */
+.sidebar-category { margin-bottom: 2px; }
+.category-header {
+  display: flex;
+  align-items: center;
+  padding: 7px 10px 7px 4px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-category);
+  white-space: nowrap;
+  overflow: hidden;
+}
+/* Tinted with the theme's category color - distinct from the neutral
+   --bg-card highlight the open board uses. */
+.category-header { background: var(--bg-category); }
+.category-header:hover { background: var(--bg-category-hover); }
+.category-header.category-drop-target { background: var(--bg-hover-strong); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Single chevron: points right when collapsed, rotated down when expanded. */
+.category-caret {
+  flex-shrink: 0;
+  width: 14px;
+  margin-right: 4px;
+  display: inline-flex; justify-content: center;
+  font-size: 15px; line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+.sidebar-category.collapsed .category-caret { transform: none; }
+.category-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.category-active-dot { flex-shrink: 0; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); }
+/* --category-line: set only where --border-subtle is too close to the
+   sidebar color to see (light, lavender). */
+.category-boards { margin-left: 10px; padding-left: 4px; border-left: 1px solid var(--category-line, var(--border-subtle)); }
+.sidebar-category.collapsed .category-boards { display: none; }
+.category-empty { padding: 6px 10px; font-size: 12px; font-style: italic; color: var(--text-faint); }
+.category-rename-row { margin-bottom: 2px; }
+.category-add-area, .category-board-add-area { padding: 4px 0; }
+.sidebar-category-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; margin: 0; border-radius: 6px; background: var(--bg-sidebar); box-shadow: 0 6px 16px rgba(0,0,0,0.5); }
+.sidebar-category-dragging-source { opacity: 0.3; }
 
 #add-board-area { padding: 6px 8px 10px; white-space: nowrap; }
 #add-board-btn {
@@ -274,7 +338,7 @@ body {
   font-size: 13px;
 }
 #add-board-btn:hover { background: var(--bg-hover-strong); }
-#new-board-input {
+#new-board-input, .sidebar-name-input {
   flex: 1;
   min-width: 0;
   padding: 8px;
@@ -381,6 +445,192 @@ body {
   background-image: repeating-linear-gradient(45deg, #c81d25 0, #c81d25 6px, #fdf3d8 6px, #fdf3d8 12px);
   pointer-events: none;
 }
+#whiteboard-toggle-btn.active { background: var(--accent); color: #fff; }
+
+/* ---------- Whiteboard ---------- */
+#whiteboard-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+/* Fixed width so "Page 1"/"Page 10" don't shift the toggles beside it. */
+/* Now shows the active page's actual name (not just "Page N"), which can
+   run arbitrarily long - grows to fit short names but caps and truncates
+   long ones instead of pushing every other toolbar button off-screen. */
+#wb-page-picker-btn { min-width: 52px; max-width: 140px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#wb-page-picker-menu {
+  position: fixed; z-index: 2000;
+  background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  width: max-content; min-width: 160px; max-width: 260px;
+  display: flex; flex-direction: column;
+}
+.wb-page-picker-row { display: flex; align-items: center; gap: 2px; }
+.wb-page-picker-name {
+  flex: 1; min-width: 0;
+  display: block; text-align: left;
+  background: none; border: none; color: var(--text-primary);
+  padding: 7px 8px; cursor: pointer; font-size: 13px; border-radius: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wb-page-picker-name:hover { background: var(--bg-hover); }
+.wb-page-picker-row-active .wb-page-picker-name { color: var(--accent); font-weight: 600; }
+.wb-page-picker-action {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  background: none; border: none; color: var(--text-faint);
+  cursor: pointer; border-radius: 4px; padding: 0;
+}
+.wb-page-picker-action:hover { background: var(--bg-hover); color: var(--text-secondary); }
+#wb-page-picker-add {
+  margin-top: 2px;
+  padding: 7px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+}
+#wb-page-picker-add:hover { background: var(--bg-hover); }
+#wb-page-picker-add:disabled { opacity: 0.4; cursor: default; }
+#whiteboard-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+#wb-text-format-group { display: flex; align-items: center; gap: 4px; }
+#wb-pen-options-group { display: flex; align-items: center; gap: 4px; }
+#wb-pen-color-dot { display: block; width: 14px; height: 14px; border-radius: 50%; background: #2b2b2b; border: 1px solid rgba(0,0,0,0.2); }
+#wb-pen-width-reset { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 40px; padding: 0 6px; }
+/* Grows/shrinks with the actual chosen width, so the stepper itself shows
+   what the next stroke will look like instead of just a number. */
+#wb-pen-width-dot { display: inline-block; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+/* Canvas-level controls (zoom, grid, snap, clear) aren't drawing tools, so
+   they're pushed to the toolbar's far right edge - margin-left:auto claims
+   all remaining space in the row, separating them from the tool cluster on
+   the left even as that cluster grows. */
+#wb-canvas-controls { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+/* Fixed box so every tool button is the same size regardless of glyph -
+   text glyphs vary a lot in visual size/weight, which made the row look
+   uneven when each button was only sized by its own padding+content. */
+.wb-tool-btn {
+  position: relative;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+.wb-tool-btn:hover { background: var(--bg-hover-strong); }
+.wb-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* The branch shape has its single stem at the TOP with the fork spreading
+   below it - the opposite of what the "Y"/"T" letters themselves look
+   like - so the button's letter is flipped vertically to actually resemble
+   the shape it draws. The button square itself is symmetric, so flipping
+   the whole element (rather than just the text inside it) looks identical
+   either way. */
+.wb-tool-btn[data-tool="branch"] { transform: scaleY(-1); }
+/* Right-click a tool to lock it active for repeated placement instead of
+   auto-reverting to Select after one shape. Note: on the branch button
+   specifically, this dot ends up bottom-right instead of top-right, since
+   it's flipped along with the rest of that button above. */
+.wb-tool-btn.wb-tool-locked::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--accent);
+}
+.wb-tool-btn svg { display: block; }
+.wb-tool-btn[data-tool="text"] { font-weight: 700; }
+#wb-marquee { fill: rgba(47, 111, 237, 0.15); stroke: #2f6fed; stroke-width: 1; pointer-events: none; }
+.wb-page-grid-line { stroke: rgba(43, 43, 43, 0.18); stroke-width: 1; stroke-dasharray: 6 4; pointer-events: none; }
+/* Vertically centers .wb-text-editor as a single flex item - the actual
+   text content lives one level down (in a plain block, not this flex
+   container) specifically so mixed content (a line-break text node
+   followed by an execCommand-inserted <b>/<u>/<span> from Bold/Italic/
+   Underline/size) never becomes multiple SIBLING flex items. Flexbox lays
+   sibling items out along the main axis (row by default) - putting that
+   split content directly on a flex container broke multi-line text the
+   moment any formatting was applied to only part of it, since the plain
+   text and the newly-wrapped formatted span became two side-by-side row
+   items instead of staying part of one continuous, wrapping block of text. */
+.wb-text-editor-wrap {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+/* While actively being typed into, overflow is allowed to show instead of
+   silently clipping - otherwise content taller than the shape's current
+   box (very easy to hit before the box has been resized to fit) renders
+   invisible with no indication anything was lost, since centered content
+   pushes both further off-screen as it grows. wbEnterTextEdit/
+   wbCommitTextEdit toggle this class; see also the standalone Text tool's
+   own auto-grow, which keeps this from being needed in that case at all. */
+.wb-text-editor-wrap.wb-text-editor-editing { overflow: visible; }
+.wb-text-editor {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: #2b2b2b;
+  outline: none;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-family: inherit;
+  cursor: text;
+}
+.wb-text-editor-center { text-align: center; }
+.wb-toolbar-sep { width: 1px; height: 18px; background: var(--border-color); margin: 0 3px; }
+/* Fixed width so 50%/100%/300% don't shift the zoom-in button beside it. */
+#wb-zoom-level-btn { min-width: 40px; text-align: center; }
+#wb-text-size-reset { min-width: 24px; text-align: center; }
+/* This is the "outside the page" color now - themed (dark/light both), so
+   it reads as neutral void space. The actual peach page-tile area is
+   painted in-world by renderWhiteboardPageGrid instead, so it stays a fixed
+   warm color and visually distinct from out-of-bounds regardless of theme. */
+#whiteboard-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-body);
+  position: relative;
+}
+#whiteboard-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: default;
+  touch-action: none;
+}
+#whiteboard-svg.panning { cursor: grabbing; }
+
 #board-background {
   position: fixed;
   inset: 0;
@@ -442,6 +692,22 @@ body {
   border-radius: 4px;
 }
 .column-menu-btn:hover { color: var(--text-secondary); background: var(--bg-hover); }
+/* Header "+" (add card to top) - deliberately the same colours as the
+   bottom "+ Add Card" button so the two read as a pair in every theme. */
+.column-add-top-btn {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  background: var(--bg-hover-strong);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.column-add-top-btn:hover { filter: brightness(1.15); }
 
 .column-ghost { position: fixed; pointer-events: none; opacity: 0.85; z-index: 1000; box-shadow: 0 6px 20px rgba(0,0,0,0.5); margin: 0; }
 .column-dragging-source { opacity: 0.3; }
@@ -492,7 +758,28 @@ body {
 .inline-add-confirm-btn:hover { background: var(--accent); color: #fff; }
 
 /* ---------- Cards ---------- */
-.cards { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 40px; overflow-y: auto; }
+/* scrollbar-color is an inherited property, and #board.scrollbar-hidden
+   (see "Auto-hiding horizontal scrollbar" in main.js) sets it to fully
+   transparent to hide *that* element's own horizontal scrollbar after a
+   few idle seconds. Without an explicit value here, .cards silently
+   inherited that transparent color too, so every column's vertical
+   scrollbar disappeared right along with the horizontal one instead of
+   staying put - this re-declares it so .cards is never affected by that
+   unrelated ancestor state. */
+.cards {
+  flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 40px; overflow-y: auto;
+  scrollbar-width: thin;
+  /* --border-color (used for the horizontal #board scrollbar above) reads
+     too faint against --bg-column in the dark and light themes - barely
+     distinguishable from the column background at a glance. --text-muted
+     is tuned per-theme to stay legible against these same background
+     tones (it's already used for secondary text on them), so it doubles
+     as a scrollbar thumb color with reliable contrast in every theme. */
+  scrollbar-color: var(--text-muted) transparent;
+}
+.cards::-webkit-scrollbar { width: 8px; }
+.cards::-webkit-scrollbar-track { background: transparent; }
+.cards::-webkit-scrollbar-thumb { background-color: var(--text-muted); border-radius: 4px; }
 .card {
   position: relative;
   background: var(--bg-card);
@@ -658,7 +945,7 @@ body {
   max-height: 85vh;
   overflow-y: auto;
 }
-#detail-modal { width: 900px; max-width: 92vw; }
+#detail-modal { width: 1010px; max-width: 92vw; }
 #settings-modal { width: 380px; }
 #background-modal { width: 320px; }
 #about-modal { width: 380px; }
@@ -713,7 +1000,8 @@ body {
 #detail-split { display: flex; min-height: 260px; margin: 4px 0 16px; }
 .detail-pane { flex: 1 1 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; }
 #detail-pane-description { padding-right: 16px; overflow-y: visible; }
-#detail-pane-side { padding-left: 16px; }
+/* Fixed width - extra modal width all goes to the description side. */
+#detail-pane-side { flex: 0 0 430px; padding-left: 16px; }
 #detail-pane-description #detail-description {
   /* Grows with typed content (see the "input" listener on this element),
      from its original 160px up to 2.5x that (400px) - past that point it
@@ -753,6 +1041,9 @@ body {
 .rte-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .rte-btn:disabled { opacity: 0.4; cursor: default; }
 .rte-btn:disabled:hover { background: var(--bg-hover); }
+/* Fixed width so the size number (10/12/14/18/24) never changes this
+   button's width and shifts every button after it in the row. */
+#rte-font-size-reset { min-width: 24px; text-align: center; }
 .rte-sep { width: 1px; height: 18px; background: var(--border-color); margin: 0 3px; }
 #rte-font-size-dec, #rte-font-size-inc { font-weight: 700; padding: 4px 9px; }
 .rte-btn[data-heading="BLOCKQUOTE"] { font-size: 15px; font-weight: 700; }
@@ -778,6 +1069,40 @@ body {
   color: var(--text-secondary);
 }
 .settings-hint { font-size: 12px; color: var(--text-muted); line-height: 1.6; margin: 0; }
+.settings-btn-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.settings-more summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+.settings-more summary:hover { color: var(--text-primary); }
+/* Theme-colored box so it's clear what the toggle expanded. */
+.settings-more-body {
+  margin-top: 6px; padding: 8px 10px; border-radius: 6px;
+  background: var(--bg-hover); border: 1px solid var(--border-color);
+}
+.settings-more-body .settings-hint + .settings-hint { margin-top: 8px; }
+.settings-btn-row .labels-add-btn { flex: 1; text-align: center; }
+/* Settings > Notifications: a master checkbox with indented sub-options
+   that grey out (but stay visible) while their parent is off. */
+.settings-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; cursor: pointer; }
+.settings-check input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.settings-sub { margin-left: 22px; }
+.settings-inline-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); }
+.settings-inline-row .settings-check { margin-bottom: 0; margin-right: 2px; }
+#notif-headsup-amount, #notif-headsup-unit {
+  padding: 3px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+#notif-headsup-amount { width: 56px; }
+.settings-check:has(input:disabled), #notif-headsup-amount:disabled, #notif-headsup-unit:disabled { opacity: 0.45; }
+.settings-check:has(input:disabled), .settings-check:has(input:disabled) input { cursor: default; }
+#notif-options + .settings-hint { margin-top: 2px; }
+
+/* "Alarms are off" line under due-time fields (card detail + due popovers). */
+.due-alarm-hint { font-size: 12px; color: var(--text-muted); margin: 6px 0; }
+.due-alarm-hint-link { background: none; border: none; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 
 /* ---------- About ---------- */
 .about-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); }
@@ -874,6 +1199,17 @@ body {
    segments genuinely need different amounts of room. */
 .due-date-row input[type="date"] { width: 128px; }
 .due-date-row input[type="time"] { width: 112px; }
+/* Repeat picker: icon + caret, faded until a repeat is set. */
+.repeat-btn {
+  display: inline-flex; align-items: center; gap: 4px; height: 31px; padding: 0 7px;
+  border-radius: 6px; border: 1px solid transparent; background: none;
+  color: var(--text-secondary); font-size: 12px; cursor: pointer; opacity: 0.55;
+}
+.repeat-btn:hover { opacity: 1; background: var(--bg-hover); }
+.repeat-btn.repeat-on { opacity: 1; color: var(--text-primary); border-color: var(--border-color); }
+.repeat-btn.hidden { display: none; }
+.repeat-caret { font-size: 10px; color: var(--text-faint); }
+.due-badge .repeat-icon { vertical-align: -2px; }
 .time-toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .clear-due-btn { background: var(--bg-hover-strong); border: none; color: var(--text-secondary); border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: 12px; white-space: nowrap; }
 .time-confirm-btn { background: var(--accent); border: none; color: #fff; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; white-space: nowrap; }
@@ -916,7 +1252,11 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 #context-menu {
   position: fixed; z-index: 2000;
   background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
-  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); min-width: 170px;
+  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  /* Sized to whatever its widest row actually needs - a swatch-only menu
+     (no text at all) stays a tight column instead of inheriting width meant
+     for the longest possible text label. */
+  width: max-content; max-width: 240px;
 }
 #context-menu button {
   display: block; width: 100%; text-align: left;
@@ -925,14 +1265,56 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 }
 #context-menu button:hover { background: var(--bg-hover); }
 #context-menu button.has-submenu { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#context-menu button.has-swatch { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .submenu-arrow { color: var(--text-faint); font-size: 12px; }
 
 #context-submenu {
   position: fixed; z-index: 2001;
   background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
-  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); min-width: 140px;
+  padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  /* Same reasoning as #context-menu above - a color submenu with the labels
+     hidden shouldn't stay padded out to a width sized for text that's no
+     longer there. */
+  width: max-content; max-width: 240px;
   display: flex; flex-direction: column;
 }
+/* Long lists (e.g. "Move to board" with every board) scroll instead of
+   running off-screen. */
+#context-submenu:not(.context-submenu-labels) { max-height: 70vh; overflow-y: auto; }
+#context-menu { max-height: 80vh; overflow-y: auto; }
+
+/* ---------- Filter (header button + panel) ---------- */
+#btn-filter { margin-left: 4px; }
+#btn-filter.filter-active { color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent); }
+#context-menu.filter-panel { min-width: 200px; max-width: 280px; }
+#context-menu.filter-panel .label-picker-row { padding: 6px 8px; }
+.filter-panel-divider { height: 1px; background: var(--border-color); margin: 4px 0; }
+#context-menu.filter-panel button[data-clear] { margin-top: 4px; color: var(--text-secondary); text-align: center; }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 3000;
+  transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+  display: flex; align-items: center; gap: 12px; max-width: min(560px, 90vw);
+  background: var(--bg-modal); color: var(--text-primary);
+  border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 10px 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  font-size: 13px; transition: opacity 0.18s ease, transform 0.18s ease;
+}
+#toast.toast-visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+#toast .toast-msg { overflow-wrap: anywhere; }
+#toast .toast-action {
+  flex-shrink: 0; background: var(--accent); color: #fff; border: none;
+  border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+}
+
+/* A card that was just pasted/duplicated pulses once so it's easy to spot. */
+@keyframes card-flash {
+  0% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+.card.card-flash { animation: card-flash 1.2s ease-out; }
+
 #context-submenu button {
   display: flex; align-items: center; gap: 8px;
   width: 100%; text-align: left;
@@ -940,6 +1322,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
   padding: 7px 10px; cursor: pointer; font-size: 13px; border-radius: 4px;
 }
 #context-submenu button:hover { background: var(--bg-hover); }
+#context-submenu button.has-swatch { justify-content: center; }
 #context-submenu.context-submenu-labels {
   width: 200px; min-width: 0; max-height: 260px; overflow-y: auto; padding: 8px;
 }
@@ -947,7 +1330,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .submenu-swatch-custom { border-radius: 50%; }
 
 #custom-color-panel {
-  position: fixed; z-index: 2500; width: 170px;
+  position: fixed; z-index: 2500; width: 190px;
   background: var(--bg-modal); border: 1px solid var(--border-color); border-radius: 8px;
   padding: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
   display: flex; flex-direction: column; gap: 8px;
@@ -976,6 +1359,22 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
   flex: 1; min-width: 0; background: var(--bg-hover); border: 1px solid var(--border-color);
   border-radius: 6px; color: var(--text-primary); padding: 5px 6px; font-size: 12px;
 }
+#ccp-save-btn {
+  width: 24px; height: 24px; flex-shrink: 0; padding: 0; border-radius: 6px;
+  background: var(--bg-hover); border: 1px solid var(--border-color);
+  color: var(--text-primary); font-size: 15px; line-height: 1; cursor: pointer;
+}
+#ccp-save-btn:hover { background: var(--bg-hover-strong); }
+#ccp-pool {
+  display: flex; flex-wrap: wrap; gap: 4px; max-height: 104px; overflow-y: auto;
+  padding-top: 8px; border-top: 1px solid var(--border-color);
+}
+.ccp-pool-swatch {
+  width: 17px; height: 17px; padding: 0; border-radius: 4px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.35);
+}
+.ccp-pool-swatch:hover { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.ccp-pool-empty { font-size: 11px; color: var(--text-faint); }
 #custom-color-panel-confirm {
   background: var(--accent); border: none; color: #fff;
   padding: 7px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;
@@ -1137,8 +1536,16 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 }
 #confirm-box { background: var(--bg-modal); color: var(--text-primary); padding: 20px; border-radius: 10px; width: 280px; }
 #confirm-box p { margin: 0 0 14px; font-size: 14px; line-height: 1.4; }
+#confirm-box.confirm-box-wide { width: 340px; }
+.orphan-cleanup-list { margin: 0 0 14px; padding-left: 20px; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.orphan-cleanup-list li { margin-bottom: 4px; }
+.orphan-cleanup-list em { font-style: normal; color: var(--text-primary); }
 #confirm-cancel { background: var(--bg-hover-strong); color: var(--text-secondary); }
 #confirm-delete { background: #7a2b2b; color: #fff; }
+.popover-buttons-stacked { flex-direction: column; }
+.popover-buttons-stacked button { padding: 8px; }
+#category-delete-keep { background: var(--accent); color: #fff; }
+#category-delete-all { background: #7a2b2b; color: #fff; }
 #input-popover-field {
   width: 100%; padding: 7px; border-radius: 6px;
   border: 1px solid var(--border-color); background: var(--bg-input);
